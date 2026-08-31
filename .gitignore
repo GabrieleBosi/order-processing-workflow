@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+runs/
+erp.sqlite
+evals/report.json
+.env
+node_modules/
+.DS_Store
