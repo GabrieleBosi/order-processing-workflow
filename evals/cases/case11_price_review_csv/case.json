@@ -1,0 +1,22 @@
+{
+  "title": "Price +3.2%: within block threshold, needs review",
+  "expected": {
+    "customer_id": "C001",
+    "order_ref": "AR-5560",
+    "n_lines": 1,
+    "lines": [
+      {
+        "sku": "TND-B450C-16",
+        "quantity_t": 25.0,
+        "unit_price": 629.0,
+        "verdict": "review"
+      }
+    ],
+    "order_verdict": "needs_review",
+    "exception_codes": [
+      "PRICE_MISMATCH"
+    ]
+  },
+  "today": "2026-09-01",
+  "input": "input.csv"
+}

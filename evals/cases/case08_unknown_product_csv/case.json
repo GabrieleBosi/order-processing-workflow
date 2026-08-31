@@ -1,0 +1,28 @@
+{
+  "title": "Unknown product code rejected, order to review",
+  "expected": {
+    "customer_id": "C003",
+    "order_ref": "CF-ORD-2299",
+    "n_lines": 2,
+    "lines": [
+      {
+        "sku": "TRV-HEB-200",
+        "quantity_t": 20.0,
+        "unit_price": 712.5,
+        "verdict": "approve"
+      },
+      {
+        "sku": null,
+        "quantity_t": 10.0,
+        "unit_price": 500.0,
+        "verdict": "reject"
+      }
+    ],
+    "order_verdict": "needs_review",
+    "exception_codes": [
+      "UNKNOWN_PRODUCT"
+    ]
+  },
+  "today": "2026-09-01",
+  "input": "input.csv"
+}

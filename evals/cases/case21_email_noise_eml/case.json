@@ -1,0 +1,22 @@
+{
+  "title": "Reply thread with signature and quoted history",
+  "judge": {
+    "focus": "did the extraction ignore the quoted history and signature?"
+  },
+  "expected": {
+    "customer_id": "C004",
+    "order_ref": "PO-88521",
+    "n_lines": 1,
+    "lines": [
+      {
+        "sku": "LAM-S355-8",
+        "quantity_t": 35.0,
+        "unit_price": 679.0,
+        "verdict": "approve"
+      }
+    ],
+    "order_verdict": "auto_approve"
+  },
+  "today": "2026-09-01",
+  "input": "input.eml"
+}

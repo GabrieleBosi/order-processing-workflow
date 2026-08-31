@@ -1,0 +1,28 @@
+{
+  "title": "kg quantity converted to tonnes",
+  "expected": {
+    "customer_id": "C006",
+    "order_ref": "OM-341",
+    "n_lines": 2,
+    "lines": [
+      {
+        "sku": "RET-EL-6X20",
+        "quantity_t": 40.0,
+        "unit_price": 690.0,
+        "verdict": "approve"
+      },
+      {
+        "sku": "TRV-IPE-160",
+        "quantity_t": 16.0,
+        "unit_price": 725.0,
+        "verdict": "approve"
+      }
+    ],
+    "order_verdict": "auto_approve",
+    "exception_codes": [
+      "UNIT_CONVERTED"
+    ]
+  },
+  "today": "2026-09-01",
+  "input": "input.txt"
+}

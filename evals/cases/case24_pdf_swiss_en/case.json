@@ -1,0 +1,25 @@
+{
+  "title": "Swiss customer PDF in English, VAT lookup",
+  "expected": {
+    "customer_id": "C007",
+    "order_ref": "BS-7720",
+    "n_lines": 2,
+    "lines": [
+      {
+        "sku": "LAM-S355-8",
+        "quantity_t": 40.0,
+        "unit_price": 675.5,
+        "verdict": "approve"
+      },
+      {
+        "sku": "HRC-S235-3",
+        "quantity_t": 28.0,
+        "unit_price": 636.9,
+        "verdict": "approve"
+      }
+    ],
+    "order_verdict": "auto_approve"
+  },
+  "today": "2026-09-01",
+  "input": "input.pdf"
+}

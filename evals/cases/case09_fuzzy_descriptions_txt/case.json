@@ -1,0 +1,25 @@
+{
+  "title": "No SKUs: fuzzy match on descriptions only",
+  "expected": {
+    "customer_id": "C008",
+    "order_ref": "PE-2026-77",
+    "n_lines": 2,
+    "lines": [
+      {
+        "sku": "RET-EL-6X20",
+        "quantity_t": 22.0,
+        "unit_price": 676.2,
+        "verdict": "approve"
+      },
+      {
+        "sku": "LAM-DC01-10",
+        "quantity_t": 14.0,
+        "unit_price": 705.6,
+        "verdict": "approve"
+      }
+    ],
+    "order_verdict": "auto_approve"
+  },
+  "today": "2026-09-01",
+  "input": "input.txt"
+}

@@ -1,0 +1,28 @@
+{
+  "title": "Price +10% vs agreement: line rejected",
+  "expected": {
+    "customer_id": "C001",
+    "order_ref": "AR-5533",
+    "n_lines": 2,
+    "lines": [
+      {
+        "sku": "TND-B450C-12",
+        "quantity_t": 30.0,
+        "unit_price": 676.0,
+        "verdict": "reject"
+      },
+      {
+        "sku": "VRG-65",
+        "quantity_t": 30.0,
+        "unit_price": 561.6,
+        "verdict": "approve"
+      }
+    ],
+    "order_verdict": "needs_review",
+    "exception_codes": [
+      "PRICE_MISMATCH"
+    ]
+  },
+  "today": "2026-09-01",
+  "input": "input.csv"
+}

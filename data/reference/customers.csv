@@ -1,0 +1,9 @@
+customer_id,name,vat_number,country,payment_terms,credit_limit_eur,status,discount_pct
+C001,Acciaierie Rossi S.p.A.,IT01234567890,IT,60gg DF,500000,active,4.0
+C002,Metallurgica Bianchi S.r.l.,IT09876543210,IT,30gg DF,250000,active,2.5
+C003,Costruzioni Ferrari S.p.A.,IT01112223334,IT,90gg DF,800000,active,5.0
+C004,SteelTrade GmbH,CHE123456789,CH,30 days net,400000,active,3.0
+C005,Edilizia Colombo S.r.l.,IT05556667778,IT,60gg DF,150000,blocked,2.0
+C006,Officine Marchetti S.n.c.,IT04443332221,IT,30gg DF,80000,active,0.0
+C007,BauStahl AG,CHE987654321,CH,45 days net,600000,active,3.5
+C008,Prefabbricati Esposito S.p.A.,IT07778889990,IT,60gg DF,350000,active,2.0

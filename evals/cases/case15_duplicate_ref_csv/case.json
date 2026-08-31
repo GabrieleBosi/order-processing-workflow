@@ -1,0 +1,30 @@
+{
+  "title": "Order reference already present in the ERP",
+  "setup": {
+    "erp_orders": [
+      {
+        "customer_id": "C002",
+        "order_ref": "MB-1150"
+      }
+    ]
+  },
+  "expected": {
+    "customer_id": "C002",
+    "order_ref": "MB-1150",
+    "n_lines": 1,
+    "lines": [
+      {
+        "sku": "TND-B450C-12",
+        "quantity_t": 25.0,
+        "unit_price": 624.0,
+        "verdict": "approve"
+      }
+    ],
+    "order_verdict": "needs_review",
+    "exception_codes": [
+      "DUPLICATE_ORDER_REF"
+    ]
+  },
+  "today": "2026-09-01",
+  "input": "input.csv"
+}

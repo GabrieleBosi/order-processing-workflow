@@ -1,0 +1,13 @@
+sku,name,name_en,aliases,unit,min_order_qty,list_price_eur
+TND-B450C-12,Tondo per cemento armato B450C Ø12mm,Rebar B450C 12mm,tondo B450C 12mm|tondo 12mm|rebar 12mm|tondo cemento armato 12|B450C diam 12,t,20,640
+TND-B450C-16,Tondo per cemento armato B450C Ø16mm,Rebar B450C 16mm,tondo B450C 16mm|tondo 16mm|rebar 16mm|tondo cemento armato 16|B450C diam 16,t,20,635
+VRG-65,Vergella SAE1008 Ø6.5mm,Wire rod SAE1008 6.5mm,vergella 6.5mm|vergella 6.5|wire rod 6.5mm|vergella SAE1008,t,25,585
+HRC-S235-3,Coils laminati a caldo S235JR sp.3mm,Hot rolled coils S235JR 3mm,coils S235 3mm|coils laminati 3mm|HRC 3mm|hot rolled coils 3mm,t,25,660
+HRC-S275-5,Coils laminati a caldo S275JR sp.5mm,Hot rolled coils S275JR 5mm,coils S275 5mm|coils laminati 5mm|HRC 5mm|hot rolled coils 5mm,t,25,680
+LAM-DC01-10,Lamiera decapata DC01 sp.1.0mm,Pickled sheet DC01 1.0mm,lamiera decapata 1.0mm|lamiera DC01|pickled sheet 1.0mm,t,10,720
+TRV-HEB-200,Travi HEB 200 S275JR,Beams HEB 200 S275JR,HEB 200|travi HEB 200|beams HEB 200|trave HEB 200,t,15,750
+TRV-IPE-160,Travi IPE 160 S235JR,Beams IPE 160 S235JR,IPE 160|travi IPE 160|beams IPE 160|trave IPE 160,t,15,725
+RET-EL-6X20,Rete elettrosaldata Ø6 maglia 20x20cm,Welded mesh 6mm 20x20cm,rete elettrosaldata 6mm|rete 20x20|welded mesh 6mm,t,5,690
+PRF-UPN-120,Profilati UPN 120 S235JR,Channels UPN 120 S235JR,UPN 120|profilati UPN 120|channels UPN 120,t,15,715
+LAM-S355-8,Lamiera da treno S355J2 sp.8mm,Heavy plate S355J2 8mm,lamiera S355 8mm|lamiera 8mm|heavy plate 8mm,t,20,700
+TBO-EN10219-60,Tubi saldati EN10219 60x60x3mm,Welded tubes EN10219 60x60x3mm,tubi 60x60|tubi saldati 60x60|tubes 60x60,t,10,745

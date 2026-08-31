@@ -1,0 +1,28 @@
+{
+  "title": "Prose order with numbers in words - needs the LLM",
+  "requires_llm": true,
+  "judge": {
+    "focus": "quantities in words, vague references to past supplies"
+  },
+  "expected": {
+    "customer_id": "C001",
+    "n_lines": 2,
+    "lines": [
+      {
+        "sku": "TND-B450C-12",
+        "quantity_t": 25.0,
+        "unit_price": null,
+        "verdict": "review"
+      },
+      {
+        "sku": "TND-B450C-16",
+        "quantity_t": 30.0,
+        "unit_price": null,
+        "verdict": "review"
+      }
+    ],
+    "order_verdict": "needs_review"
+  },
+  "today": "2026-09-01",
+  "input": "input.eml"
+}

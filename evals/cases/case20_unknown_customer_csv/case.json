@@ -1,0 +1,14 @@
+{
+  "title": "Unknown customer: order rejected",
+  "expected": {
+    "customer_id": null,
+    "order_ref": "CV-100",
+    "n_lines": 1,
+    "order_verdict": "rejected",
+    "exception_codes": [
+      "UNKNOWN_CUSTOMER"
+    ]
+  },
+  "today": "2026-09-01",
+  "input": "input.csv"
+}

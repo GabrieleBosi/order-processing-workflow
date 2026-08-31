@@ -1,0 +1,52 @@
+{
+  "title": "Six-line order, one line below MOQ",
+  "expected": {
+    "customer_id": "C003",
+    "order_ref": "CF-ORD-2415",
+    "n_lines": 6,
+    "lines": [
+      {
+        "sku": "TRV-HEB-200",
+        "quantity_t": 45.0,
+        "unit_price": 712.5,
+        "verdict": "approve"
+      },
+      {
+        "sku": "TRV-IPE-160",
+        "quantity_t": 30.0,
+        "unit_price": 688.75,
+        "verdict": "approve"
+      },
+      {
+        "sku": "TND-B450C-12",
+        "quantity_t": 25.0,
+        "unit_price": 608.0,
+        "verdict": "approve"
+      },
+      {
+        "sku": "TND-B450C-16",
+        "quantity_t": 25.0,
+        "unit_price": 603.25,
+        "verdict": "approve"
+      },
+      {
+        "sku": "PRF-UPN-120",
+        "quantity_t": 10.0,
+        "unit_price": 679.25,
+        "verdict": "review"
+      },
+      {
+        "sku": "HRC-S275-5",
+        "quantity_t": 30.0,
+        "unit_price": 646.0,
+        "verdict": "approve"
+      }
+    ],
+    "order_verdict": "needs_review",
+    "exception_codes": [
+      "BELOW_MOQ"
+    ]
+  },
+  "today": "2026-09-01",
+  "input": "input.eml"
+}

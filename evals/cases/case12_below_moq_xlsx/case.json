@@ -1,0 +1,28 @@
+{
+  "title": "Quantity below minimum order quantity",
+  "expected": {
+    "customer_id": "C003",
+    "order_ref": "CF-ORD-2310",
+    "n_lines": 2,
+    "lines": [
+      {
+        "sku": "TRV-HEB-200",
+        "quantity_t": 8.0,
+        "unit_price": 712.5,
+        "verdict": "review"
+      },
+      {
+        "sku": "PRF-UPN-120",
+        "quantity_t": 20.0,
+        "unit_price": 679.25,
+        "verdict": "approve"
+      }
+    ],
+    "order_verdict": "needs_review",
+    "exception_codes": [
+      "BELOW_MOQ"
+    ]
+  },
+  "today": "2026-09-01",
+  "input": "input.xlsx"
+}

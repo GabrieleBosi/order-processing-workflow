@@ -1,0 +1,25 @@
+{
+  "title": "Free-text remark on a line forces human review",
+  "judge": {
+    "focus": "was the urgency remark preserved and attached to the line?"
+  },
+  "expected": {
+    "customer_id": "C001",
+    "order_ref": "AR-5601",
+    "n_lines": 1,
+    "lines": [
+      {
+        "sku": "TND-B450C-12",
+        "quantity_t": 25.0,
+        "unit_price": 614.4,
+        "verdict": "review"
+      }
+    ],
+    "order_verdict": "needs_review",
+    "exception_codes": [
+      "R6_NOTES_REGULAR"
+    ]
+  },
+  "today": "2026-09-01",
+  "input": "input.txt"
+}

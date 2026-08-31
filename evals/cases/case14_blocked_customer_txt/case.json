@@ -1,0 +1,22 @@
+{
+  "title": "Blocked customer: order rejected before ERP",
+  "expected": {
+    "customer_id": "C005",
+    "order_ref": "EC-889",
+    "n_lines": 1,
+    "lines": [
+      {
+        "sku": "TND-B450C-12",
+        "quantity_t": 25.0,
+        "unit_price": 627.2,
+        "verdict": "approve"
+      }
+    ],
+    "order_verdict": "rejected",
+    "exception_codes": [
+      "CUSTOMER_BLOCKED"
+    ]
+  },
+  "today": "2026-09-01",
+  "input": "input.txt"
+}

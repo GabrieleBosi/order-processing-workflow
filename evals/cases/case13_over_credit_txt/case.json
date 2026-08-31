@@ -1,0 +1,22 @@
+{
+  "title": "Order value exceeds customer credit limit",
+  "expected": {
+    "customer_id": "C006",
+    "order_ref": "OM-355",
+    "n_lines": 1,
+    "lines": [
+      {
+        "sku": "TRV-HEB-200",
+        "quantity_t": 120.0,
+        "unit_price": 750.0,
+        "verdict": "approve"
+      }
+    ],
+    "order_verdict": "needs_review",
+    "exception_codes": [
+      "OVER_CREDIT_LIMIT"
+    ]
+  },
+  "today": "2026-09-01",
+  "input": "input.txt"
+}

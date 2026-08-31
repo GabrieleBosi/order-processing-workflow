@@ -1,0 +1,28 @@
+{
+  "title": "Missing quantity on one line",
+  "expected": {
+    "customer_id": "C002",
+    "order_ref": "MB-1240",
+    "n_lines": 2,
+    "lines": [
+      {
+        "sku": "VRG-65",
+        "quantity_t": null,
+        "unit_price": 570.38,
+        "verdict": "reject"
+      },
+      {
+        "sku": "LAM-DC01-10",
+        "quantity_t": 12.0,
+        "unit_price": 702.0,
+        "verdict": "approve"
+      }
+    ],
+    "order_verdict": "needs_review",
+    "exception_codes": [
+      "MISSING_QUANTITY"
+    ]
+  },
+  "today": "2026-09-01",
+  "input": "input.xlsx"
+}

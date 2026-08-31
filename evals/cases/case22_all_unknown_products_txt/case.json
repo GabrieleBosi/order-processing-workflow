@@ -1,0 +1,23 @@
+{
+  "title": "No line matches the catalogue: order rejected",
+  "expected": {
+    "customer_id": "C007",
+    "n_lines": 2,
+    "lines": [
+      {
+        "sku": null,
+        "verdict": "reject"
+      },
+      {
+        "sku": null,
+        "verdict": "reject"
+      }
+    ],
+    "order_verdict": "rejected",
+    "exception_codes": [
+      "UNKNOWN_PRODUCT"
+    ]
+  },
+  "today": "2026-09-01",
+  "input": "input.txt"
+}
