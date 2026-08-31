@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "order-workflow"
+version = "0.1.0"
+description = "Fixed-step (Level 2) order-processing workflow: normalize -> extract -> reconcile -> check -> ERP write"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.7",
+    "anthropic>=1.2.0",
+    "openpyxl>=3.1",
+    "pypdf>=4.0",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "reportlab>=4.0",
+    "ruff>=0.4",
+]
+ocr = [
+    "pytesseract>=0.3.10",
+    "pdf2image>=1.17",
+]
+
+[project.scripts]
+orderflow = "order_workflow.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+order_workflow = ["webstatic/*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "SIM", "C4"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
