@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workflow Ordini — MVP</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
+<style>
+  :root{
+    --bg:#f4f5f7; --card:#ffffff; --ink:#1a202c; --muted:#64748b; --line:#e2e8f0;
+    --accent:#0f4c81; --accent-soft:#e8f0f7;
+    --ok:#15803d; --ok-bg:#ecfdf3; --warn:#b45309; --warn-bg:#fffbeb; --bad:#b91c1c; --bad-bg:#fef2f2;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  header{background:var(--accent);color:#fff;padding:14px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  header h1{font-size:17px;margin:0;font-weight:600;letter-spacing:.2px}
+  header .sub{opacity:.75;font-size:12.5px}
+  .badge{margin-left:auto;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);
+         border-radius:99px;padding:3px 12px;font-size:12px}
+  main{max-width:1400px;margin:20px auto;padding:0 18px;display:grid;gap:16px;
+       grid-template-columns:minmax(290px,1fr) minmax(380px,1.4fr) minmax(300px,1fr)}
+  @media(max-width:1050px){main{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;align-self:start}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:0 0 12px}
+  .drop{border:2px dashed #b8c4d4;border-radius:10px;padding:22px;text-align:center;color:var(--muted);
+        cursor:pointer;transition:.15s}
+  .drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+  .drop strong{display:block;color:var(--ink);font-size:14.5px;margin-bottom:4px}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:99px;padding:4px 11px;font-size:12px;
+        cursor:pointer;color:var(--accent);transition:.12s}
+  .chip:hover{background:var(--accent-soft);border-color:var(--accent)}
+  .muted{color:var(--muted);font-size:12.5px}
+  .steps{list-style:none;margin:14px 0 0;padding:0}
+  .steps li{display:flex;align-items:center;gap:9px;padding:6px 0;border-top:1px dashed var(--line);font-size:13px}
+  .steps .dot{width:20px;height:20px;border-radius:50%;background:var(--line);color:#fff;font-size:11px;
+              display:flex;align-items:center;justify-content:center;flex:none}
+  .steps li.done .dot{background:var(--ok)} .steps li.err .dot{background:var(--bad)}
+  .steps .ms{margin-left:auto;color:var(--muted);font-size:11.5px;white-space:nowrap}
+  .docmeta{font-size:12.5px;margin-top:12px}
+  .docmeta div{padding:2px 0}
+  pre.doc{background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:11.5px;
+          max-height:220px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{color:var(--muted);text-align:left;font-weight:600;font-size:11px;text-transform:uppercase;
+     letter-spacing:.5px;padding:6px 8px;border-bottom:1px solid var(--line)}
+  td{padding:7px 8px;border-bottom:1px solid #eef2f7;vertical-align:top}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .v{display:inline-block;border-radius:99px;padding:2px 10px;font-size:11px;font-weight:600}
+  .v.approve{background:var(--ok-bg);color:var(--ok)} .v.review{background:var(--warn-bg);color:var(--warn)}
+  .v.reject{background:var(--bad-bg);color:var(--bad)}
+  .banner{border-radius:8px;padding:11px 13px;font-size:13px;margin:12px 0 0;border:1px solid}
+  .banner.ok{background:var(--ok-bg);border-color:#bbe5c8;color:var(--ok)}
+  .banner.warn{background:var(--warn-bg);border-color:#f2e0b0;color:var(--warn)}
+  .banner.bad{background:var(--bad-bg);border-color:#f4c6c6;color:var(--bad)}
+  .reasons{margin:6px 0 0;padding-left:18px;font-size:12px;color:var(--muted)}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;font-size:12.5px;margin-bottom:10px}
+  .kv dt{color:var(--muted)} .kv dd{margin:0}
+  button.primary{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:10px 16px;
+                 font-size:13.5px;font-weight:600;cursor:pointer;width:100%}
+  button.primary:disabled{background:#9fb2c4;cursor:not-allowed}
+  button.ghost{background:none;border:1px solid var(--line);border-radius:8px;padding:5px 10px;
+               font-size:12px;color:var(--muted);cursor:pointer}
+  .erp-order{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:9px;background:#fbfcfe}
+  .erp-order .id{font-weight:700;color:var(--accent);font-size:13px}
+  .erp-order .tot{float:right;font-weight:600}
+  .erp-line{font-size:12px;color:var(--muted);padding:2px 0 0 8px}
+  .flash{animation:flash 1.6s ease-out}
+  @keyframes flash{0%{background:#fff7d6}100%{background:#fbfcfe}}
+  .footer-note{grid-column:1/-1;color:var(--muted);font-size:12px;text-align:center;padding:4px 0 18px}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--accent-soft);
+           border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .hidden{display:none}
+  .costline{font-size:11.5px;color:var(--muted);margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Workflow Ordini</h1>
+  <span class="sub">mail / PDF / Excel &rarr; estrazione &rarr; controlli &rarr; ERP</span>
+  <span class="badge" id="mode-badge">…</span>
+</header>
+
+<main>
+  <!-- ------------------------------------------------ 1 · documento -->
+  <section class="card">
+    <h2>1 · Documento in arrivo</h2>
+    <div class="drop" id="drop">
+      <strong>Carica un ordine</strong>
+      trascina qui il file oppure clicca<br>
+      <span class="muted" id="upload-formats">.eml · .pdf · .xlsx · .csv · .txt</span>
+      <input type="file" id="file-input" class="hidden" accept=".eml,.pdf,.xlsx,.xlsm,.csv,.txt">
+    </div>
+    <div class="chips" id="samples"></div>
+    <div id="doc-panel" class="hidden">
+      <div class="docmeta" id="doc-meta"></div>
+      <pre class="doc" id="doc-preview"></pre>
+      <ul class="steps" id="steps"></ul>
+      <div class="costline" id="costline"></div>
+    </div>
+  </section>
+
+  <!-- ------------------------------------- 2 · estrazione e controlli -->
+  <section class="card">
+    <h2>2 · Estrazione e controllo riga per riga</h2>
+    <div id="extract-empty" class="muted">Carica un documento per vedere l’estrazione.</div>
+    <div id="extract-panel" class="hidden">
+      <dl class="kv" id="order-head"></dl>
+      <table>
+        <thead><tr><th>#</th><th>Prodotto</th><th class="num">Q.tà (t)</th>
+        <th class="num">Prezzo</th><th class="num">Atteso</th><th>Esito</th></tr></thead>
+        <tbody id="lines"></tbody>
+      </table>
+      <div id="order-banner"></div>
+      <ul class="reasons" id="order-reasons"></ul>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------ 3 · gestionale -->
+  <section class="card">
+    <h2>3 · Gestionale (ERP)</h2>
+    <button class="primary" id="confirm-btn" disabled>Conferma e scrivi in ERP</button>
+    <p class="muted" id="confirm-hint" style="margin:8px 0 0">
+      La scrittura in ERP richiede sempre una conferma umana.</p>
+    <div id="erp-msg"></div>
+    <div style="display:flex;align-items:center;margin:16px 0 6px">
+      <h2 style="margin:0">Ordini registrati</h2>
+      <button class="ghost" id="erp-reset" style="margin-left:auto" title="Solo demo">svuota</button>
+    </div>
+    <div id="erp-orders"><p class="muted">Nessun ordine ancora registrato.</p></div>
+  </section>
+
+  <div class="footer-note" id="footer-note"></div>
+</main>
+
+<script src="demo_data.js"></script>
+<script>
+"use strict";
+/* ============================================================ helpers */
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (n, d=2) => n == null ? "—" :
+  Number(n).toLocaleString("it-IT",{minimumFractionDigits:d,maximumFractionDigits:d});
+const VLABEL = {approve:"approva", review:"verifica", reject:"scarta"};
+
+/* ===================================================== API backend */
+function apiBackend(){
+  const j = async (r) => {
+    if(!r.ok){ let d; try{ d = (await r.json()).detail }catch(e){} throw new Error(d || r.statusText); }
+    return r.json();
+  };
+  return {
+    kind: "api",
+    info: () => fetch("/api/info").then(j),
+    samples: () => fetch("/api/samples").then(j),
+    processSample: (n) => fetch("/api/process-sample/"+encodeURIComponent(n),{method:"POST"}).then(j),
+    processFile: (f) => { const fd = new FormData(); fd.append("file", f);
+                          return fetch("/api/process",{method:"POST",body:fd}).then(j); },
+    confirm: (id) => fetch("/api/confirm/"+id,{method:"POST"}).then(j),
+    erpOrders: () => fetch("/api/erp/orders").then(j),
+    erpReset: null,
+  };
+}
+
+/* ==================================================== demo backend
+   Static build (Netlify): no server. The five samples replay runs
+   precomputed by the Python pipeline; uploaded .txt/.csv/.eml files go
+   through a small deterministic JS engine that mirrors the code paths
+   (regular formats only - the LLM lives in the full backend). The ERP
+   is simulated in localStorage. */
+function demoBackend(D){
+  const LS = "orderflow_demo_erp_v1";
+  const cfg = D.reference.config;
+  const norm = (s) => String(s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  const store = {
+    list(){ try{ return JSON.parse(localStorage.getItem(LS)||"[]") }catch(e){ return [] } },
+    save(o){ try{ localStorage.setItem(LS, JSON.stringify(o)) }catch(e){} },
+  };
+  const pending = {};
+
+  function parseNumber(raw){
+    if(raw == null) return null;
+    let s = String(raw).trim().replace(/[€$\s]|EUR|USD|CHF/gi,"").replace(/'/g,"");
+    if(!/\d/.test(s)) return null;
+    const neg = s.startsWith("-"); s = s.replace(/^[+-]/,"");
+    const hc = s.includes(","), hd = s.includes(".");
+    if(hc && hd){ s = s.lastIndexOf(",") > s.lastIndexOf(".") ? s.replace(/\./g,"").replace(",",".") : s.replace(/,/g,""); }
+    else if(hc){ const p = s.split(",");
+      s = (p.length>2 || (p.length===2 && p[1].length===3 && p[0].length>3)) ? s.replace(/,/g,"") : s.replace(",",".");
+    } else if(hd){ const p = s.split(".");
+      if(p.length>2 || (p.length===2 && p[1].length===3 && p[0]!=="0" && p[0].length<=3)) s = s.replace(/\./g,"");
+    }
+    const v = parseFloat(s); return isNaN(v) ? null : (neg ? -v : v);
+  }
+  function parseDate(raw){
+    if(!raw) return null; const s = String(raw);
+    let m = s.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/); if(m) return iso(+m[1],+m[2],+m[3]);
+    m = s.match(/\b(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})\b/); if(m) return iso(+m[3],+m[2],+m[1]);
+    m = s.match(/\b(\d{1,2})-(\d{1,2})-(\d{4})\b/); if(m) return iso(+m[3],+m[2],+m[1]);
+    return null;
+  }
+  const iso = (y,mo,d) => { const dt = new Date(Date.UTC(y,mo-1,d));
+    return isNaN(dt) ? null : dt.toISOString().slice(0,10); };
+  const toT = (q,u) => q == null ? null : (u === "kg" ? Math.round(q)/1000 : Math.round(q*1000)/1000);
+  const normUnit = (u) => { u = String(u||"").toLowerCase().replace(/\.$/,"");
+    if(["t","to","ton","tons","tonne","tonnes","tonn","tonnellate","tonnellata","mt"].includes(u)) return "t";
+    if(["kg","kgs"].includes(u)) return "kg"; return u || null; };
+
+  function findCustomer(name, vat){
+    if(vat){ const v = vat.toUpperCase().replace(/\s/g,"");
+      const hit = D.reference.customers.find(c => c.vat_number.toUpperCase() === v); if(hit) return hit; }
+    if(!name) return null;
+    const t = norm(name);
+    return D.reference.customers.find(c => { const cn = norm(c.name);
+      return cn === t || cn.includes(t) || t.includes(cn); }) || null;
+  }
+  function findProduct(sku, desc){
+    if(sku){ const k = sku.trim().toUpperCase();
+      let hit = D.reference.products.find(p => p.sku.toUpperCase() === k);
+      if(hit) return {p:hit, how:"exact_sku", conf:1};
+      hit = D.reference.products.find(p => p.aliases.split("|").some(a => a.trim().toUpperCase() === k));
+      if(hit) return {p:hit, how:"alias", conf:1};
+    }
+    if(!desc) return null;
+    const tt = new Set(norm(desc).split(" ").filter(Boolean));
+    let best = null, bs = 0;
+    for(const p of D.reference.products){
+      for(const cand of [p.name, p.name_en, ...p.aliases.split("|")]){
+        const ct = norm(cand).split(" ").filter(Boolean); if(!ct.length) continue;
+        const ov = ct.filter(x => tt.has(x)).length / ct.length;
+        const score = (norm(cand) === norm(desc)) ? 1 : ov * 0.9;
+        if(score > bs){ bs = score; best = p; }
+      }
+    }
+    return (best && bs >= 0.55) ? {p:best, how:"fuzzy_name", conf:Math.round(bs*1000)/1000} : null;
+  }
+
+  const NOTE_RX = /(urgente|urgent|se possibile|if possible|come (?:l')?ultima|as (?:per )?last|da confermare|to be confirmed|sconto|discount|salvo|flessibil|anticip)/i;
+  const STOP_RX = /(cordiali|distinti|regards|saluti|firma|disclaimer|confidenzial|www\.|@.*\.(com|it|ch))/i;
+  const QTY_RX  = /(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*(t|ton[sn]?|tonnellate|kg)\b/i;
+  const PRICE_RX= /(?:@|a|al prezzo di|prezzo|price(?:\s+of)?|per|at|zu)?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*(?:€|eur|euro)\s*(?:\/\s*(?:t|ton))?/gi;
+  const SKU_RX  = /\b([A-Z]{2,4}-[A-Z0-9][A-Z0-9.\-]{1,15})\b/;
+  const REF_RX  = /(?:rif(?:erimento)?|ordine(?:\s+di acquisto)?\s*(?:n[.°ro]*)?|order\s*(?:ref(?:erence)?|no|n[.°]|number)?|po)\s*[:.]?\s*([A-Z][A-Z0-9\/-]*\d[A-Z0-9\/-]*|\d[A-Z0-9\/-]{4,})/i;
+  const SUFFIX_RX = /\b(S\.?p\.?A\.?|S\.?r\.?l\.?|S\.?n\.?c\.?|GmbH|AG|Ltd\.?|SA)\b/;
+
+  const SYN = {
+    sku:["codice","cod","codice articolo","articolo","art","sku","item","item code","code","product code"],
+    description:["descrizione","desc","materiale","prodotto","description","material","product"],
+    quantity:["qta","qtà","q.tà","quantita","quantità","qty","quantity","tons","tonnellate","peso"],
+    unit:["um","u.m","unit","uom"],
+    unit_price:["prezzo","prezzo unitario","price","unit price","€/t","eur/t"],
+    delivery_date:["consegna","data consegna","delivery","delivery date","resa"],
+    notes:["note","notes","osservazioni","remarks"],
+  };
+
+  function headerInfo(text, fromName){
+    const out = {customer_name:null, customer_vat:null, order_ref:null, delivery_date:null};
+    let m = text.match(/(?:cliente|customer|ragione sociale|mittente)\s*[:.]\s*(.+)/i);
+    if(m) out.customer_name = m[1].trim().replace(/[.,;]+$/,"");
+    else if(fromName) out.customer_name = fromName;
+    if(!out.customer_name){
+      for(const l of text.split("\n").slice(0,6)){ const s = l.trim();
+        if(s && !/^spett/i.test(s) && SUFFIX_RX.test(s)){ out.customer_name = s.replace(/[.,;]+$/,""); break; } }
+    }
+    m = text.match(/(?:p\.?\s*iva|vat(?:\s*number)?)\s*[:.]?\s*([A-Z]{0,3}\s?\d[\d\s]{6,})/i);
+    if(m) out.customer_vat = m[1].replace(/\s/g,"");
+    m = text.replace(/data ordine/gi,"").match(REF_RX);
+    if(m) out.order_ref = m[1];
+    m = text.match(/(?:consegna|delivery|resa)[^:\n]*[:.]?\s*(.+)/i);
+    if(m) out.delivery_date = parseDate(m[1]);
+    return out;
+  }
+
+  function extractText(text){
+    const lines = [];
+    for(let raw of text.split("\n")){
+      const line = raw.trim().replace(/^[-*•]+\s*/,"");
+      if(!line || STOP_RX.test(line)) continue;
+      const qm = line.match(QTY_RX); if(!qm) continue;
+      const qty = parseNumber(qm[1]), unit = normUnit(qm[2]);
+      const sm = line.match(SKU_RX);
+      let price = null;
+      for(const pm of line.matchAll(PRICE_RX)){ const c = parseNumber(pm[1]); if(c != null && c !== qty) price = c; }
+      let desc = line.replace(QTY_RX," ");
+      desc = desc.replace(PRICE_RX," ");
+      if(sm) desc = desc.replace(sm[1]," ");
+      desc = desc.replace(/\s{2,}/g," ").replace(/^[\s\-–—:;,.@]+|[\s\-–—:;,.@]+$/g,"");
+      lines.push({description:desc, sku:sm ? sm[1] : null, quantity:qty, unit,
+                  unit_price:price, currency:price != null ? "EUR" : null,
+                  delivery_date:null, notes:NOTE_RX.test(line) ? line : null});
+    }
+    return lines;
+  }
+
+  function extractCsv(text){
+    const delim = [",",";","\t"].reduce((a,b) => (text.split(a).length >= text.split(b).length ? a : b));
+    const rows = text.split("\n").map(l => l.split(delim).map(c => c.trim())).filter(r => r.some(c => c));
+    const isHeader = (r) => r.filter(c => Object.values(SYN).flat().includes(c.toLowerCase().replace(/[.:]+$/,""))).length >= 2;
+    const hIdx = rows.findIndex(isHeader);
+    if(hIdx < 0) return {preamble:text, lines:[]};
+    const map = {};
+    rows[hIdx].forEach((h,i) => { const k = h.toLowerCase().replace(/[.:]+$/,"");
+      for(const f in SYN) if(!(f in map) && SYN[f].includes(k)) map[f] = i; });
+    const lines = rows.slice(hIdx+1).map(r => {
+      const cell = (f) => map[f] != null && r[map[f]] ? r[map[f]] : null;
+      if(!cell("sku") && !cell("description") && !cell("quantity")) return null;
+      return {description:cell("description")||"", sku:cell("sku"),
+              quantity:parseNumber(cell("quantity")), unit:normUnit(cell("unit")),
+              unit_price:parseNumber(cell("unit_price")), currency:"EUR",
+              delivery_date:parseDate(cell("delivery_date")), notes:cell("notes")};
+    }).filter(Boolean);
+    return {preamble:rows.slice(0,hIdx).map(r => r.join(" ")).join("\n"), lines};
+  }
+
+  function parseEml(text){
+    const nl = text.replace(/\r\n/g,"\n");
+    const sep = nl.indexOf("\n\n");
+    const head = sep < 0 ? "" : nl.slice(0,sep), body = sep < 0 ? nl : nl.slice(sep+2);
+    const h = (n) => { const m = head.match(new RegExp("^"+n+":\\s*(.+)$","mi")); return m ? m[1].trim() : ""; };
+    const from = h("From");
+    const name = (from.match(/^"?([^"<]+)"?\s*</) || [,""])[1].trim();
+    return {subject:h("Subject"), fromName:name, body};
+  }
+
+  function runPipeline(filename, ext, text){
+    const t0 = performance.now();
+    const traces = [];
+    const mark = (step, name, summary) => traces.push({step, name, status:"ok",
+      duration_ms:Math.max(0.1, Math.round((performance.now()-t0)*10)/10 - (traces.reduce((a,t)=>a+t.duration_ms,0))),
+      summary, llm_usage:null});
+
+    // 1 normalize
+    let docText = text, meta = {}, srcType = ext === "eml" ? "email" : (ext === "csv" ? "csv" : "text");
+    if(ext === "eml"){ const e = parseEml(text); docText = e.body;
+      meta = {subject:e.subject, from:e.fromName}; }
+    mark(1,"normalize", srcType+": "+docText.length+" caratteri");
+
+    // 2 extract (code/heuristic - the demo engine has no LLM)
+    let lines, preamble = docText;
+    if(ext === "csv"){ const r = extractCsv(docText); lines = r.lines; preamble = r.preamble; }
+    else lines = extractText(docText);
+    const head = headerInfo((meta.subject ? meta.subject+"\n" : "") + preamble +
+                            (ext !== "csv" ? "" : ""), meta.from);
+    if(ext !== "csv"){ const h2 = headerInfo((meta.subject ? meta.subject+"\n" : "") + docText, meta.from);
+      Object.assign(head, Object.fromEntries(Object.entries(h2).filter(([k,v]) => v != null))); }
+    lines.forEach((l,i) => l.line_no = i+1);
+    const extracted = {...head, order_date:null, currency:"EUR", language:null, notes:null,
+                       extraction_method: ext === "csv" ? "code" : "heuristic", lines};
+    mark(2,"extract", lines.length+" righe via "+extracted.extraction_method);
+
+    // 3 reconcile
+    const customer = findCustomer(head.customer_name, head.customer_vat);
+    const orderExc = [];
+    if(!customer) orderExc.push({code:"UNKNOWN_CUSTOMER", severity:"blocking",
+      message:"Cliente non trovato in anagrafica: "+(head.customer_name||"?")});
+    else if(customer.status !== "active") orderExc.push({code:"CUSTOMER_BLOCKED", severity:"blocking",
+      message:"Cliente "+customer.name+" bloccato."});
+    if(customer && head.order_ref &&
+       store.list().some(o => o.customer_id === customer.customer_id &&
+                              o.order_ref.toUpperCase() === head.order_ref.toUpperCase()))
+      orderExc.push({code:"DUPLICATE_ORDER_REF", severity:"warning",
+        message:"Riferimento "+head.order_ref+" già presente nel gestionale."});
+    let totalValue = 0, anyValue = false;
+    const rlines = lines.map(ext_ => {
+      const exc = [];
+      const hit = findProduct(ext_.sku, ext_.description);
+      if(!hit) exc.push({code:"UNKNOWN_PRODUCT", severity:"blocking",
+        message:"Nessun prodotto in anagrafica per riga "+ext_.line_no+"."});
+      let qt = null;
+      if(ext_.quantity == null || ext_.quantity <= 0)
+        exc.push({code:"MISSING_QUANTITY", severity:"blocking", message:"Quantità mancante."});
+      else { qt = toT(ext_.quantity, ext_.unit || "t");
+        if(ext_.unit === "kg") exc.push({code:"UNIT_CONVERTED", severity:"info",
+          message:ext_.quantity+" kg convertiti in "+qt+" t."}); }
+      let expected = null, deltaPct = null;
+      if(hit && customer){
+        expected = Math.round(hit.p.list_price_eur * (1 - customer.discount_pct/100) * 100) / 100;
+        if(ext_.unit_price == null)
+          exc.push({code:"MISSING_PRICE", severity:"info",
+            message:"Prezzo assente: vale il prezzo concordato "+fmt(expected)+" EUR/t."});
+        else { deltaPct = Math.round((ext_.unit_price - expected)/expected * 10000) / 100;
+          if(Math.abs(deltaPct) > cfg.price_review_tolerance_pct)
+            exc.push({code:"PRICE_MISMATCH",
+              severity:Math.abs(deltaPct) > cfg.price_block_tolerance_pct ? "blocking" : "warning",
+              message:"Prezzo "+fmt(ext_.unit_price)+" vs concordato "+fmt(expected)+" ("+deltaPct.toFixed(1)+"%)."});
+        }
+      }
+      if(hit && qt != null && qt < hit.p.min_order_qty)
+        exc.push({code:"BELOW_MOQ", severity:"warning",
+          message:qt+" t sotto il minimo d'ordine ("+hit.p.min_order_qty+" t)."});
+      const price = ext_.unit_price != null ? ext_.unit_price : expected;
+      let value = null;
+      if(price != null && qt != null){ value = Math.round(price*qt*100)/100; totalValue += value; anyValue = true; }
+      return {extracted:ext_, product:hit ? {sku:hit.p.sku, name:hit.p.name, unit:"t",
+              min_order_qty:hit.p.min_order_qty, list_price:hit.p.list_price_eur} : null,
+              match_method:hit ? hit.how : null, match_confidence:hit ? hit.conf : null,
+              quantity_t:qt, expected_price:expected, price_delta_pct:deltaPct,
+              line_value:value, exceptions:exc};
+    });
+    const orderValue = anyValue ? Math.round(totalValue*100)/100 : null;
+    if(customer && orderValue != null && customer.credit_limit_eur > 0 && orderValue > customer.credit_limit_eur)
+      orderExc.push({code:"OVER_CREDIT_LIMIT", severity:"warning",
+        message:"Valore ordine "+fmt(orderValue,0)+" EUR oltre il fido di "+fmt(customer.credit_limit_eur,0)+" EUR."});
+    if(!lines.length) orderExc.push({code:"NO_VALID_LINES", severity:"blocking",
+      message:"Nessuna riga d'ordine estratta dal documento."});
+    const reconciled = {customer, order_value:orderValue, exceptions:orderExc, lines:rlines,
+                        extracted};
+    mark(3,"reconcile", (customer ? "cliente "+customer.customer_id : "cliente NON trovato")+
+         ", "+rlines.filter(l => l.product).length+"/"+rlines.length+" righe abbinate");
+
+    // 4 check (rules; note terms escalate to review - no LLM in the static demo)
+    const today = new Date(); today.setHours(0,0,0,0);
+    const lead = new Date(today); lead.setDate(lead.getDate() + cfg.min_lead_days);
+    const clines = rlines.map(rl => {
+      let verdict = "approve"; const reasons = [];
+      const up = (v) => { const rank = {approve:0, review:1, reject:2};
+        if(rank[v] > rank[verdict]) verdict = v; };
+      for(const e of rl.exceptions){
+        if(e.severity === "blocking"){ up("reject"); reasons.push(e.code+": "+e.message); }
+        else if(e.severity === "warning"){ up("review"); reasons.push(e.code+": "+e.message); }
+      }
+      const dd = rl.extracted.delivery_date || extracted.delivery_date;
+      if(dd){ const d = new Date(dd+"T00:00:00");
+        if(d < today){ up("review"); reasons.push("R5_DELIVERY_DATE: data di consegna nel passato ("+dd+")."); }
+        else if(d < lead){ up("review"); reasons.push("R5_DELIVERY_DATE: consegna entro il lead time minimo."); } }
+      if(rl.extracted.notes){ up("review");
+        reasons.push("R6_NOTES_REGULAR: nota libera sulla riga — richiede verifica umana."); }
+      if(rl.match_method === "fuzzy_name" && rl.match_confidence < 0.8){ up("review");
+        reasons.push("Abbinamento prodotto a bassa confidenza ("+rl.match_confidence+")."); }
+      return {reconciled:rl, verdict, reasons, rule_results:[], llm_opinion:null};
+    });
+    let orderVerdict = "auto_approve"; const orderReasons = [];
+    for(const e of orderExc){ orderReasons.push(e.code+": "+e.message);
+      if(e.severity === "blocking") orderVerdict = "rejected";
+      else if(e.severity === "warning" && orderVerdict !== "rejected") orderVerdict = "needs_review"; }
+    if(orderVerdict !== "rejected"){
+      if(clines.length && clines.every(l => l.verdict === "reject")){ orderVerdict = "rejected";
+        orderReasons.push("Tutte le righe sono state scartate."); }
+      else if(clines.some(l => l.verdict !== "approve")) orderVerdict = "needs_review";
+    }
+    const nA = clines.filter(l=>l.verdict==="approve").length,
+          nR = clines.filter(l=>l.verdict==="review").length,
+          nX = clines.filter(l=>l.verdict==="reject").length;
+    const checked = {reconciled, lines:clines, order_verdict:orderVerdict, order_reasons:orderReasons,
+      summary:clines.length+" righe: "+nA+" approva, "+nR+" verifica, "+nX+" scarta."};
+    mark(4,"check", checked.summary);
+
+    const run = {run_id:"demo-"+Math.random().toString(36).slice(2,10), source_file:filename,
+      created_at:new Date().toISOString(),
+      status:orderVerdict === "rejected" ? "rejected" : "awaiting_confirmation",
+      normalized:{source_file:filename, source_type:srcType, text:docText, tables:[],
+                  metadata:meta, warnings:[], ocr_used:false},
+      extracted, reconciled, checked, erp_result:null, traces, error:null};
+    pending[run.run_id] = run;
+    return run;
+  }
+
+  function confirmRun(run){
+    const writable = run.checked.lines.filter(l => l.verdict !== "reject");
+    const orders = store.list();
+    const id = "SO-DEMO-" + String(orders.length + 1).padStart(4,"0");
+    const total = Math.round(writable.reduce((a,l) => a + (l.reconciled.line_value || 0), 0)*100)/100;
+    orders.unshift({erp_order_id:id, order_ref:run.extracted.order_ref || "",
+      customer_id:run.reconciled.customer ? run.reconciled.customer.customer_id : "",
+      customer_name:run.reconciled.customer ? run.reconciled.customer.name : (run.extracted.customer_name||""),
+      currency:"EUR", total_value:total, status:"open", created_at:new Date().toISOString(),
+      lines:writable.map(l => ({line_no:l.reconciled.extracted.line_no,
+        sku:l.reconciled.product ? l.reconciled.product.sku : (l.reconciled.extracted.sku||""),
+        description:l.reconciled.product ? l.reconciled.product.name : l.reconciled.extracted.description,
+        quantity_t:l.reconciled.quantity_t, unit_price:l.reconciled.extracted.unit_price,
+        line_value:l.reconciled.line_value, verdict:l.verdict}))});
+    store.save(orders);
+    run.erp_result = {erp_order_id:id, written_lines:writable.length,
+      skipped_line_nos:run.checked.lines.filter(l => l.verdict === "reject").map(l => l.reconciled.extracted.line_no),
+      message:"Ordine "+id+" registrato con "+writable.length+" riga/e (demo, salvato nel browser)."};
+    run.status = "written";
+    run.traces.push({step:5, name:"erp_write", status:"ok", duration_ms:1,
+                     summary:run.erp_result.message, llm_usage:null});
+    return run;
+  }
+
+  return {
+    kind: "demo",
+    info: async () => ({mode:"demo", model:null}),
+    samples: async () => D.sample_meta,
+    processSample: async (n) => {
+      const src = D.samples[n]; if(!src) throw new Error("Esempio non trovato");
+      const run = JSON.parse(JSON.stringify(src));
+      run.run_id = "demo-" + Math.random().toString(36).slice(2,10);
+      run.erp_result = null;
+      if(run.status === "written") run.status = "awaiting_confirmation";
+      pending[run.run_id] = run;
+      return run;
+    },
+    processFile: async (f) => {
+      const ext = f.name.toLowerCase().split(".").pop();
+      if(!["txt","csv","eml"].includes(ext))
+        throw new Error("La demo statica elabora .txt, .csv e .eml. Per PDF/Excel usa gli esempi qui sotto, o il backend completo (orderflow serve).");
+      return runPipeline(f.name, ext, await f.text());
+    },
+    confirm: async (id) => { const run = pending[id]; if(!run) throw new Error("Run non trovato");
+      if(run.status !== "awaiting_confirmation") throw new Error("L'ordine non è in attesa di conferma.");
+      return confirmRun(run); },
+    erpOrders: async () => store.list(),
+    erpReset: async () => store.save([]),
+  };
+}
+
+/* ========================================================== rendering */
+const api = window.DEMO_DATA ? demoBackend(window.DEMO_DATA) : apiBackend();
+let currentRun = null;
+
+async function init(){
+  try{
+    const info = await api.info();
+    $("mode-badge").textContent =
+      info.mode === "llm" ? "estrazione LLM · " + info.model :
+      info.mode === "demo" ? "demo statica · motore deterministico" :
+      "modalità deterministica (senza LLM)";
+    $("footer-note").textContent = api.kind === "demo"
+      ? "Demo statica: i 5 esempi replicano run reali della pipeline Python; i file caricati (.txt/.csv/.eml) passano da un motore deterministico nel browser. Il gestionale è simulato in localStorage."
+      : "MVP locale: pipeline Python a 5 passi con tracciamento per run. La scrittura in ERP (mock) avviene solo dopo conferma.";
+    if(api.kind === "demo") $("upload-formats").textContent = ".txt · .csv · .eml (PDF/Excel: usa gli esempi)";
+    const samples = await api.samples();
+    $("samples").innerHTML = samples.map(s =>
+      `<span class="chip" data-name="${esc(s.name)}">${esc(s.name)}</span>`).join("");
+    document.querySelectorAll(".chip").forEach(c =>
+      c.addEventListener("click", () => processSample(c.dataset.name)));
+    refreshErp();
+  }catch(e){ $("mode-badge").textContent = "backend non raggiungibile"; }
+}
+
+function busy(on){
+  $("drop").innerHTML = on
+    ? '<span class="spinner"></span> elaborazione in corso…'
+    : '<strong>Carica un ordine</strong>trascina qui il file oppure clicca<br><span class="muted" id="upload-formats">' +
+      (api.kind === "demo" ? ".txt · .csv · .eml (PDF/Excel: usa gli esempi)" : ".eml · .pdf · .xlsx · .csv · .txt") +
+      '</span><input type="file" id="file-input" class="hidden" accept=".eml,.pdf,.xlsx,.xlsm,.csv,.txt">';
+  if(!on) wireDrop();
+}
+
+async function processSample(name){ await guard(() => api.processSample(name)); }
+async function processFile(file){ await guard(() => api.processFile(file)); }
+
+async function guard(fn){
+  busy(true);
+  $("erp-msg").innerHTML = "";
+  try{ currentRun = await fn(); render(currentRun); }
+  catch(e){ alert(e.message || e); }
+  finally{ busy(false); }
+}
+
+function render(run){
+  $("doc-panel").classList.remove("hidden");
+  $("extract-empty").classList.add("hidden");
+  $("extract-panel").classList.remove("hidden");
+
+  // document
+  const d = run.normalized || {};
+  const metaBits = [];
+  metaBits.push(`<div><b>${esc(run.source_file)}</b> · ${esc(d.source_type || "?")}</div>`);
+  if(d.metadata && d.metadata.subject) metaBits.push(`<div>Oggetto: ${esc(d.metadata.subject)}</div>`);
+  if(d.metadata && d.metadata.from) metaBits.push(`<div>Da: ${esc(d.metadata.from)}</div>`);
+  if(d.ocr_used) metaBits.push('<div>OCR utilizzato</div>');
+  (d.warnings || []).forEach(w => metaBits.push(`<div style="color:var(--warn)">⚠ ${esc(w)}</div>`));
+  $("doc-meta").innerHTML = metaBits.join("");
+  let preview = d.text || "";
+  (d.tables || []).forEach(t => { preview += "\n\n[" + (t.name || "tabella") + "]\n" +
+    t.headers.join(" | ") + "\n" + t.rows.map(r => r.join(" | ")).join("\n"); });
+  $("doc-preview").textContent = preview.trim().slice(0, 4000) || "(nessun testo)";
+
+  // steps
+  const names = {normalize:"Normalizzazione", extract:"Estrazione", reconcile:"Riconciliazione",
+                 check:"Controllo righe", erp_write:"Scrittura ERP"};
+  $("steps").innerHTML = (run.traces || []).map(t =>
+    `<li class="${t.status === "ok" ? "done" : "err"}"><span class="dot">${t.step}</span>
+     ${esc(names[t.name] || t.name)}${t.llm_usage && t.llm_usage.calls ? " · LLM" : ""}
+     <span class="ms">${t.duration_ms.toFixed(0)} ms</span></li>`).join("");
+  const usage = (run.traces || []).reduce((a,t) => t.llm_usage ?
+    {c:a.c + t.llm_usage.calls, usd:a.usd + t.llm_usage.cost_usd} : a, {c:0, usd:0});
+  $("costline").textContent = usage.c
+    ? `Costo LLM di questo run: ${usage.c} chiamata/e, $${usage.usd.toFixed(4)}`
+    : "Nessuna chiamata LLM in questo run (solo codice deterministico).";
+
+  // extraction
+  const ex = run.extracted || {lines:[]};
+  const rec = run.reconciled || {};
+  const cust = rec.customer;
+  $("order-head").innerHTML =
+    `<dt>Cliente</dt><dd>${cust ? esc(cust.name) + " · " + esc(cust.customer_id)
+        : esc(ex.customer_name || "—") + ' <span class="v reject">non in anagrafica</span>'}</dd>` +
+    `<dt>Riferimento</dt><dd>${esc(ex.order_ref || "—")}</dd>` +
+    `<dt>Consegna</dt><dd>${esc(ex.delivery_date || "—")}</dd>` +
+    `<dt>Valore</dt><dd>${rec.order_value != null ? fmt(rec.order_value) + " " + esc(ex.currency) : "—"}</dd>` +
+    `<dt>Estrazione</dt><dd>${{code:"codice (tabellare)", llm:"LLM", heuristic:"euristica (senza LLM)"}[ex.extraction_method] || esc(ex.extraction_method)}</dd>`;
+
+  const checked = run.checked || {lines:[]};
+  $("lines").innerHTML = checked.lines.map(l => {
+    const r = l.reconciled, e = r.extracted;
+    const reasons = l.reasons.length
+      ? `<ul class="reasons">${l.reasons.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : "";
+    return `<tr>
+      <td>${e.line_no}</td>
+      <td>${r.product ? esc(r.product.name) + ` <span class="muted">(${esc(r.product.sku)})</span>`
+            : esc(e.description || e.sku || "?")}${reasons}</td>
+      <td class="num">${r.quantity_t != null ? fmt(r.quantity_t, r.quantity_t % 1 ? 3 : 0) : "—"}</td>
+      <td class="num">${e.unit_price != null ? fmt(e.unit_price) : "—"}</td>
+      <td class="num">${r.expected_price != null ? fmt(r.expected_price) : "—"}</td>
+      <td><span class="v ${l.verdict}">${VLABEL[l.verdict]}</span></td></tr>`;
+  }).join("");
+
+  const vb = {auto_approve:["ok","Ordine coerente: può essere registrato senza interventi."],
+              needs_review:["warn","Servono verifiche umane prima della registrazione."],
+              rejected:["bad","Ordine non registrabile."]}[checked.order_verdict] || ["warn",""];
+  const counts = {approve:0, review:0, reject:0};
+  checked.lines.forEach(l => counts[l.verdict]++);
+  const itSummary = `${checked.lines.length} righe: ${counts.approve} approva, ` +
+                    `${counts.review} verifica, ${counts.reject} scarta.`;
+  $("order-banner").innerHTML =
+    `<div class="banner ${vb[0]}"><b>${esc(itSummary)}</b> ${esc(vb[1])}</div>`;
+  $("order-reasons").innerHTML = (checked.order_reasons || []).map(x => `<li>${esc(x)}</li>`).join("");
+
+  // confirm
+  const btn = $("confirm-btn");
+  btn.disabled = run.status !== "awaiting_confirmation";
+  btn.textContent = run.status === "written" ? "Ordine registrato ✓"
+    : checked.order_verdict === "needs_review" ? "Confermo le verifiche: scrivi in ERP"
+    : "Conferma e scrivi in ERP";
+  $("confirm-hint").textContent =
+    run.status === "rejected" ? "Ordine respinto: la scrittura in ERP è bloccata."
+    : run.status === "written" ? ""
+    : "La scrittura in ERP richiede sempre una conferma umana.";
+
+  if(run.erp_result) showErpMsg(run.erp_result);
+}
+
+function showErpMsg(res){
+  $("erp-msg").innerHTML = `<div class="banner ${res.erp_order_id ? "ok" : "bad"}">${esc(res.message)}
+    ${res.skipped_line_nos && res.skipped_line_nos.length
+      ? "<br>Righe scartate non scritte: " + res.skipped_line_nos.join(", ") : ""}</div>`;
+}
+
+async function refreshErp(flashId){
+  try{
+    const orders = await api.erpOrders();
+    $("erp-orders").innerHTML = orders.length ? orders.map(o => `
+      <div class="erp-order ${o.erp_order_id === flashId ? "flash" : ""}">
+        <span class="id">${esc(o.erp_order_id)}</span>
+        <span class="tot">${fmt(o.total_value)} ${esc(o.currency)}</span><br>
+        <span class="muted">${esc(o.customer_name)} · rif ${esc(o.order_ref || "—")}</span>
+        ${(o.lines || []).map(l => `<div class="erp-line">${l.line_no}. ${esc(l.sku)} —
+          ${l.quantity_t != null ? fmt(l.quantity_t, l.quantity_t % 1 ? 3 : 0) : "?"} t
+          @ ${l.unit_price != null ? fmt(l.unit_price) : "prezzo listino"}</div>`).join("")}
+      </div>`).join("")
+      : '<p class="muted">Nessun ordine ancora registrato.</p>';
+  }catch(e){ /* backend gone */ }
+}
+
+$("confirm-btn").addEventListener("click", async () => {
+  if(!currentRun) return;
+  const c = currentRun.checked;
+  const warnTxt = c.order_verdict === "needs_review"
+    ? "\n\nATTENZIONE: l'ordine ha righe in verifica. Confermando dichiari di averle controllate." : "";
+  if(!window.confirm("Scrivere l'ordine nel gestionale?" + warnTxt)) return;
+  try{
+    currentRun = await api.confirm(currentRun.run_id);
+    render(currentRun);
+    refreshErp(currentRun.erp_result && currentRun.erp_result.erp_order_id);
+  }catch(e){ alert(e.message || e); }
+});
+
+$("erp-reset").addEventListener("click", async () => {
+  if(api.erpReset){ await api.erpReset(); refreshErp(); }
+  else alert("Nel backend completo il gestionale si svuota cancellando erp.sqlite.");
+});
+
+function wireDrop(){
+  const drop = $("drop"), input = $("file-input");
+  drop.addEventListener("click", () => input && input.click());
+  if(input) input.addEventListener("change", () => input.files[0] && processFile(input.files[0]));
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+  drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over");
+    e.dataTransfer.files[0] && processFile(e.dataTransfer.files[0]); });
+}
+
+wireDrop();
+init();
+</script>
+</body>
+</html>

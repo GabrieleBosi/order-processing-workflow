@@ -1,0 +1,4 @@
+# Static MVP demo - publishes the prebuilt page in app/netlify.
+# The full app (LLM extraction, real pipeline) runs locally: `orderflow serve`.
+[build]
+  publish = "app/netlify"
