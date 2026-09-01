@@ -16,6 +16,9 @@ def test_parse_number_formats():
     assert parse_number("614,40") == 614.4
     assert parse_number("620") == 620.0
     assert parse_number("1.250") == 1250.0         # three digits after dot = thousands
+    assert parse_number("1,250") == 1250.0         # symmetric rule for the comma
+    assert parse_number("0,375") == 0.375          # ...unless the integer part is 0
+    assert parse_number("1745,00") == 1745.0
     assert parse_number("0.5") == 0.5
     assert parse_number("12.5") == 12.5
     assert parse_number("1.234.567") == 1234567.0

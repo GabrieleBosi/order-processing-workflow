@@ -97,3 +97,38 @@ def test_signature_and_quoted_reply_ignored():
     # the quoted "99 t" line must not become an order line
     assert len(order.lines) == 1
     assert order.lines[0].quantity == 20.0
+
+
+def test_machine_numbers_from_excel_not_locale_guessed():
+    # A typed Excel cell 24.375 is 24.375 t, never twenty-four thousand.
+    doc = _doc(
+        text="Cliente: Acme S.p.A.",
+        tables=[Table(headers=["Codice", "Qta", "Prezzo"],
+                      rows=[["TND-B450C-12", "24.375", "614.4"]],
+                      numeric_source="machine")],
+    )
+    order = _run(doc)
+    assert order.lines[0].quantity == 24.375
+    assert order.lines[0].unit_price == 614.4
+
+
+def test_four_digit_price_not_truncated():
+    order = _run(_doc("Acme S.p.A.\n- 20 t lamiera 8mm a 1745,00 EUR/t\n"))
+    assert order.lines[0].unit_price == 1745.0
+
+
+def test_data_ordine_uppercase_not_order_ref():
+    order = _run(_doc("Acme S.p.A.\nDATA ORDINE: 12/05/2026\nORDINE AB-77\n- 25 t tondo 12mm\n"))
+    assert order.order_ref == "AB-77"
+
+
+def test_vat_does_not_cross_newlines():
+    order = _run(_doc("Acme S.p.A.\nP.IVA\n01234567890 non e' una partita iva qui\n- 25 t tondo 12mm\n"))
+    assert order.customer_vat is None
+
+
+def test_spettle_two_line_salutation_skipped():
+    order = _run(_doc(
+        "Spett.le\nDuferco Commerciale S.p.A.\n\nAcme Steel S.r.l.\n- 25 t tondo 12mm a 620 \u20ac/t\n"
+    ))
+    assert order.customer_name == "Acme Steel S.r.l."

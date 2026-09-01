@@ -39,11 +39,17 @@ class Pipeline:
 
     # ------------------------------------------------------------- steps
 
-    def process(self, path: Path | str, today: date | None = None) -> PipelineRun:
-        """Run steps 1-4. Never writes to the ERP."""
+    def process(
+        self, path: Path | str, today: date | None = None, display_name: str | None = None
+    ) -> PipelineRun:
+        """Run steps 1-4. Never writes to the ERP.
+
+        `display_name` labels the run and its traces when `path` is a
+        temporary copy (web uploads), so traces reference the real file.
+        """
         run = PipelineRun(
             run_id=uuid.uuid4().hex[:12],
-            source_file=str(path),
+            source_file=display_name or str(path),
             created_at=utcnow(),
         )
         recorder = TraceRecorder(self.config.runs_dir, run.run_id, enabled=self.trace_enabled)

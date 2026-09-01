@@ -78,3 +78,23 @@ def test_scanned_pdf_warns_without_ocr(tmp_path):
     doc = normalize.run(p)
     assert doc.text == "" or len(doc.text) < 40
     assert doc.ocr_used or any("OCR" in w for w in doc.warnings)
+
+
+def test_email_with_csv_attachment(tmp_path):
+    import base64
+
+    csv_payload = base64.b64encode(
+        b"Codice;Descrizione;Qta;UM;Prezzo\nTND-B450C-12;Tondo;25;t;614,40\n"
+    ).decode()
+    p = tmp_path / "order.eml"
+    p.write_text(
+        'From: "Acme S.p.A." <a@acme.it>\nSubject: ordine\nMIME-Version: 1.0\n'
+        'Content-Type: multipart/mixed; boundary="BB"\n\n'
+        "--BB\nContent-Type: text/plain\n\nordine in allegato\n"
+        "--BB\nContent-Type: text/csv\nContent-Disposition: attachment; filename=ordine.csv\n"
+        "Content-Transfer-Encoding: base64\n\n" + csv_payload + "\n--BB--\n"
+    )
+    doc = normalize.run(p)
+    assert len(doc.tables) == 1
+    assert doc.tables[0].rows[0][0] == "TND-B450C-12"
+    assert "ordine in allegato" in doc.text

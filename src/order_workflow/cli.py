@@ -89,24 +89,27 @@ def _cmd_process(args) -> int:
         for reason in line.reasons:
             print(f"        {reason}")
 
-    if args.json:
-        print(run.model_dump_json(indent=2))
-
     if run.status == RunStatus.REJECTED:
         print("\nOrder rejected: it cannot be written to the ERP.")
-        print(f"Trace: {config.runs_dir / run.run_id}/")
-        return 0
-
-    if args.write:
-        if not args.yes:
-            reply = input("\nWrite this order to the ERP? [y/N] ").strip().lower()
-            if reply not in ("y", "yes", "s", "si", "sì"):
-                print("Not written. The run stays at awaiting_confirmation.")
-                return 0
-        run = pipeline.confirm(run)
-        print(f"\nERP: {run.erp_result.message}")
+    elif args.write:
+        confirmed = args.yes
+        if not confirmed:
+            try:
+                reply = input("\nWrite this order to the ERP? [y/N] ").strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                reply = ""
+            confirmed = reply in ("y", "yes", "s", "si", "sì")
+        if confirmed:
+            run = pipeline.confirm(run)
+            print(f"\nERP: {run.erp_result.message}")
+        else:
+            print("Not written. The run stays at awaiting_confirmation.")
     else:
         print("\nNot written to the ERP (use --write to confirm). Guardrail: writing requires a human yes.")
+
+    if args.json:
+        # Printed last so the JSON reflects the final state, ERP write included.
+        print(run.model_dump_json(indent=2))
     print(f"Trace: {config.runs_dir / run.run_id}/")
     return 0
 

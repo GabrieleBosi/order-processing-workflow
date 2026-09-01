@@ -1,0 +1,22 @@
+{
+  "title": "Delivery inside the minimum lead time (2 days)",
+  "expected": {
+    "customer_id": "C003",
+    "order_ref": "CF-ORD-2360",
+    "n_lines": 1,
+    "lines": [
+      {
+        "sku": "TRV-IPE-160",
+        "quantity_t": 20.0,
+        "unit_price": 688.75,
+        "verdict": "review"
+      }
+    ],
+    "order_verdict": "needs_review",
+    "exception_codes": [
+      "R5_DELIVERY_DATE"
+    ]
+  },
+  "today": "2026-09-01",
+  "input": "input.csv"
+}

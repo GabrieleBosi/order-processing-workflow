@@ -111,3 +111,43 @@ def test_blocked_customer(reference, erp):
 def test_no_lines_flagged(reference, erp):
     rec = reconcile.run(_order(lines=[]), reference, erp, Config())
     assert ExceptionCode.NO_VALID_LINES in codes(rec)
+
+
+def test_unknown_unit_flagged_not_assumed(reference, erp):
+    rec = reconcile.run(_order(lines=[_line(quantity=50, unit="pz")]), reference, erp, Config())
+    assert rec.lines[0].quantity_t is None
+    assert ExceptionCode.UNIT_UNKNOWN in codes(rec)
+
+
+def test_price_below_agreement_symmetric(reference, erp):
+    # agreed 614.40 for C001; -3.2% -> warning, -10% -> blocking
+    rec = reconcile.run(_order(lines=[_line(unit_price=594.6)]), reference, erp, Config())
+    exc = [e for e in rec.lines[0].exceptions if e.code == ExceptionCode.PRICE_MISMATCH]
+    assert exc and exc[0].severity.value == "warning"
+    rec = reconcile.run(_order(lines=[_line(unit_price=552.9)]), reference, erp, Config())
+    exc = [e for e in rec.lines[0].exceptions if e.code == ExceptionCode.PRICE_MISMATCH]
+    assert exc and exc[0].severity.value == "blocking"
+
+
+def test_wrong_size_never_matched(reference, erp):
+    # 14mm rebar is not in the catalogue; it must NOT match the 12mm product.
+    rec = reconcile.run(_order(lines=[_line(description="tondo B450C 14mm", sku=None)]),
+                        reference, erp, Config())
+    assert rec.lines[0].product is None
+    assert ExceptionCode.UNKNOWN_PRODUCT in codes(rec)
+
+
+def test_lookalike_product_capped_below_review_gate(reference, erp):
+    # HEA 200 (not in catalogue) may fuzzy-hit HEB 200, but confidence must
+    # stay under the 0.8 gate so step 4 forces a review instead of approving.
+    hit = reference.search_product_by_description("Travi HEA 200 S275JR")
+    if hit is not None:
+        product, confidence, ambiguous = hit
+        assert confidence < 0.8
+
+
+def test_fuzzy_customer_match_flagged_uncertain(reference, erp):
+    rec = reconcile.run(_order(customer="Acciaierie Rosi Srl", lines=[_line()]),
+                        reference, erp, Config())
+    if rec.customer is not None:
+        assert ExceptionCode.CUSTOMER_MATCH_UNCERTAIN in codes(rec)

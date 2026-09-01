@@ -38,6 +38,8 @@ class ExceptionCode(str, enum.Enum):
     DUPLICATE_ORDER_REF = "DUPLICATE_ORDER_REF"
     INVALID_DELIVERY_DATE = "INVALID_DELIVERY_DATE"
     UNIT_CONVERTED = "UNIT_CONVERTED"
+    UNIT_UNKNOWN = "UNIT_UNKNOWN"
+    CUSTOMER_MATCH_UNCERTAIN = "CUSTOMER_MATCH_UNCERTAIN"
     MISSING_QUANTITY = "MISSING_QUANTITY"
     MISSING_PRICE = "MISSING_PRICE"
     IRREGULAR_NOTE = "IRREGULAR_NOTE"
@@ -73,6 +75,9 @@ class Table(BaseModel):
     name: str = ""
     headers: list[str] = Field(default_factory=list)
     rows: list[list[str]] = Field(default_factory=list)
+    # "machine": cell values came from typed cells (Excel), so "24.375" is
+    # unambiguously 24.375 and must not go through locale guessing.
+    numeric_source: Literal["text", "machine"] = "text"
 
 
 class NormalizedDocument(BaseModel):

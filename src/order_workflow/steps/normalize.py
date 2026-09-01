@@ -165,7 +165,10 @@ def _normalize_excel(path: Path) -> NormalizedDocument:
         preamble.extend(
             " ".join(cell for cell in row if cell) for row in rows[:header_idx]
         )
-        table = Table(name=ws.title, headers=rows[header_idx], rows=rows[header_idx + 1 :])
+        table = Table(
+            name=ws.title, headers=rows[header_idx], rows=rows[header_idx + 1 :],
+            numeric_source="machine",  # openpyxl cells are typed: no locale guessing
+        )
         doc.tables.append(table)
     wb.close()
     doc.text = "\n".join(preamble).strip()

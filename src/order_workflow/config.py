@@ -53,7 +53,28 @@ class Config:
         return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
 
 
+def _load_dotenv() -> None:
+    """Load KEY=VALUE lines from .env (cwd first, then repo root).
+
+    Deliberately tiny - no dependency, no interpolation. Real environment
+    variables always win over .env values.
+    """
+    for candidate in (Path.cwd() / ".env", REPO_ROOT / ".env"):
+        if not candidate.is_file():
+            continue
+        for raw in candidate.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key, value = key.strip(), value.strip().strip("'\"")
+            if key and value and key not in os.environ:
+                os.environ[key] = value
+        break
+
+
 def load_config() -> Config:
+    _load_dotenv()
     cfg = Config()
     cfg.llm_mode = os.environ.get("ORDERFLOW_LLM", cfg.llm_mode).lower()
     cfg.model = os.environ.get("ORDERFLOW_MODEL", cfg.model)

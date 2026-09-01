@@ -76,3 +76,27 @@ def test_erp_ids_increment(pipeline):
     r1 = pipeline.confirm(pipeline.process(CASES / "case01_email_it_clean" / "input.eml", today=TODAY))
     r2 = pipeline.confirm(pipeline.process(CASES / "case03_csv_clean" / "input.csv", today=TODAY))
     assert r1.erp_result.erp_order_id != r2.erp_result.erp_order_id
+
+
+def test_duplicate_ref_rechecked_at_write_time(pipeline):
+    # The same PO processed twice before either confirm: the second confirm
+    # must be refused, not double-booked.
+    src = CASES / "case01_email_it_clean" / "input.eml"
+    run1 = pipeline.process(src, today=TODAY)
+    run2 = pipeline.process(src, today=TODAY)
+    assert run2.checked.order_verdict.value == "auto_approve"  # nothing flagged yet
+    pipeline.confirm(run1)
+    run2 = pipeline.confirm(run2)
+    assert run2.erp_result.erp_order_id is None
+    assert "refused" in run2.erp_result.message
+    assert len(pipeline.erp.list_orders()) == 1
+
+
+def test_web_upload_trace_uses_display_name(pipeline, config):
+    run = pipeline.process(
+        CASES / "case01_email_it_clean" / "input.eml", today=TODAY,
+        display_name="ordine_cliente.eml",
+    )
+    assert run.source_file == "ordine_cliente.eml"
+    trace = (config.runs_dir / run.run_id / "trace.md").read_text()
+    assert "ordine_cliente.eml" in trace

@@ -89,9 +89,12 @@
   <section class="card">
     <h2>1 · Documento in arrivo</h2>
     <div class="drop" id="drop">
-      <strong>Carica un ordine</strong>
-      trascina qui il file oppure clicca<br>
-      <span class="muted" id="upload-formats">.eml · .pdf · .xlsx · .csv · .txt</span>
+      <div id="drop-idle">
+        <strong>Carica un ordine</strong>
+        trascina qui il file oppure clicca<br>
+        <span class="muted" id="upload-formats">.eml · .pdf · .xlsx · .csv · .txt</span>
+      </div>
+      <div id="drop-busy" class="hidden"><span class="spinner"></span> elaborazione in corso…</div>
       <input type="file" id="file-input" class="hidden" accept=".eml,.pdf,.xlsx,.xlsm,.csv,.txt">
     </div>
     <div class="chips" id="samples"></div>
@@ -242,17 +245,18 @@ function demoBackend(D){
   const NOTE_RX = /(urgente|urgent|se possibile|if possible|come (?:l')?ultima|as (?:per )?last|da confermare|to be confirmed|sconto|discount|salvo|flessibil|anticip)/i;
   const STOP_RX = /(cordiali|distinti|regards|saluti|firma|disclaimer|confidenzial|www\.|@.*\.(com|it|ch))/i;
   const QTY_RX  = /(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*(t|ton[sn]?|tonnellate|kg)\b/i;
-  const PRICE_RX= /(?:@|a|al prezzo di|prezzo|price(?:\s+of)?|per|at|zu)?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*(?:€|eur|euro)\s*(?:\/\s*(?:t|ton))?/gi;
+  const PRICE_RX= /(?:@|a|al prezzo di|prezzo|price(?:\s+of)?|per|at|zu)?\s*(\d{1,3}(?:[.,']\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*(?:€|eur|euro)\s*(?:\/\s*(?:t|ton))?/gi;
   const SKU_RX  = /\b([A-Z]{2,4}-[A-Z0-9][A-Z0-9.\-]{1,15})\b/;
   const REF_RX  = /(?:rif(?:erimento)?|ordine(?:\s+di acquisto)?\s*(?:n[.°ro]*)?|order\s*(?:ref(?:erence)?|no|n[.°]|number)?|po)\s*[:.]?\s*([A-Z][A-Z0-9\/-]*\d[A-Z0-9\/-]*|\d[A-Z0-9\/-]{4,})/i;
   const SUFFIX_RX = /\b(S\.?p\.?A\.?|S\.?r\.?l\.?|S\.?n\.?c\.?|GmbH|AG|Ltd\.?|SA)\b/;
 
+  // Kept in sync with COLUMN_SYNONYMS in steps/extract.py.
   const SYN = {
-    sku:["codice","cod","codice articolo","articolo","art","sku","item","item code","code","product code"],
-    description:["descrizione","desc","materiale","prodotto","description","material","product"],
-    quantity:["qta","qtà","q.tà","quantita","quantità","qty","quantity","tons","tonnellate","peso"],
-    unit:["um","u.m","unit","uom"],
-    unit_price:["prezzo","prezzo unitario","price","unit price","€/t","eur/t"],
+    sku:["codice","cod","codice articolo","articolo","art","sku","item","item code","code","product code","codice prodotto"],
+    description:["descrizione","desc","materiale","prodotto","description","material","product","designazione"],
+    quantity:["qta","qtà","q.tà","quantita","quantità","qty","quantity","tons","tonnellate","peso","weight"],
+    unit:["um","u.m","unit","uom","unita","unità"],
+    unit_price:["prezzo","prezzo unitario","prezzo unit","price","unit price","€/t","eur/t","prezzo €/t","price eur/t","prezzo eur/t"],
     delivery_date:["consegna","data consegna","delivery","delivery date","resa"],
     notes:["note","notes","osservazioni","remarks"],
   };
@@ -278,6 +282,7 @@ function demoBackend(D){
   function extractText(text){
     const lines = [];
     for(let raw of text.split("\n")){
+      if(/^\s*>/.test(raw)) continue;  // quoted reply history
       const line = raw.trim().replace(/^[-*•]+\s*/,"");
       if(!line || STOP_RX.test(line)) continue;
       const qm = line.match(QTY_RX); if(!qm) continue;
@@ -535,12 +540,9 @@ async function init(){
 }
 
 function busy(on){
-  $("drop").innerHTML = on
-    ? '<span class="spinner"></span> elaborazione in corso…'
-    : '<strong>Carica un ordine</strong>trascina qui il file oppure clicca<br><span class="muted" id="upload-formats">' +
-      (api.kind === "demo" ? ".txt · .csv · .eml (PDF/Excel: usa gli esempi)" : ".eml · .pdf · .xlsx · .csv · .txt") +
-      '</span><input type="file" id="file-input" class="hidden" accept=".eml,.pdf,.xlsx,.xlsm,.csv,.txt">';
-  if(!on) wireDrop();
+  // Toggle only: the drop zone's children (and its wired listeners) persist.
+  $("drop-idle").hidden = on;
+  $("drop-busy").classList.toggle("hidden", !on);
 }
 
 async function processSample(name){ await guard(() => api.processSample(name)); }
@@ -551,7 +553,7 @@ async function guard(fn){
   $("erp-msg").innerHTML = "";
   try{ currentRun = await fn(); render(currentRun); }
   catch(e){ alert(e.message || e); }
-  finally{ busy(false); }
+  finally{ busy(false); $("file-input").value = ""; }
 }
 
 function render(run){
@@ -666,11 +668,13 @@ $("confirm-btn").addEventListener("click", async () => {
   const warnTxt = c.order_verdict === "needs_review"
     ? "\n\nATTENZIONE: l'ordine ha righe in verifica. Confermando dichiari di averle controllate." : "";
   if(!window.confirm("Scrivere l'ordine nel gestionale?" + warnTxt)) return;
+  const btn = $("confirm-btn");
+  btn.disabled = true;  // no double-click double-write
   try{
     currentRun = await api.confirm(currentRun.run_id);
     render(currentRun);
     refreshErp(currentRun.erp_result && currentRun.erp_result.erp_order_id);
-  }catch(e){ alert(e.message || e); }
+  }catch(e){ alert(e.message || e); btn.disabled = currentRun.status !== "awaiting_confirmation"; }
 });
 
 $("erp-reset").addEventListener("click", async () => {

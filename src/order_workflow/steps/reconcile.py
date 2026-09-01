@@ -27,8 +27,19 @@ def run(
     order = ReconciledOrder(extracted=extracted)
 
     # --- customer -------------------------------------------------------
-    customer = reference.find_customer(extracted.customer_name, extracted.customer_vat)
+    customer_hit = reference.find_customer(extracted.customer_name, extracted.customer_vat)
+    customer, customer_confidence = customer_hit if customer_hit else (None, 0.0)
     order.customer = customer
+    if customer is not None and customer_confidence < 0.87:
+        order.exceptions.append(
+            OrderException(
+                code=ExceptionCode.CUSTOMER_MATCH_UNCERTAIN,
+                severity=Severity.WARNING,
+                message=f"Customer matched by name similarity only ({customer_confidence:.2f}): "
+                        f"{extracted.customer_name!r} -> {customer.name} ({customer.customer_id}). "
+                        "Confirm the identity before booking.",
+            )
+        )
     if customer is None:
         order.exceptions.append(
             OrderException(
@@ -74,17 +85,28 @@ def run(
             if hit:
                 line.product, line.match_method = hit
                 line.match_confidence = 1.0
+        ambiguous_match = False
         if line.product is None and ext.description:
             fuzzy = reference.search_product_by_description(ext.description)
             if fuzzy:
-                line.product, line.match_confidence = fuzzy
+                line.product, line.match_confidence, ambiguous_match = fuzzy
                 line.match_method = "fuzzy_name"
         if line.product is None and ext.sku and ext.description is not None:
             # Last resort: the SKU may be mistyped; try fuzzy on the SKU too.
             fuzzy = reference.search_product_by_description(ext.sku)
             if fuzzy and fuzzy[1] >= 0.75:
-                line.product, line.match_confidence = fuzzy
+                line.product, line.match_confidence, ambiguous_match = fuzzy
                 line.match_method = "fuzzy_sku"
+        if line.product is not None and ambiguous_match:
+            line.exceptions.append(
+                OrderException(
+                    code=ExceptionCode.AMBIGUOUS_PRODUCT,
+                    severity=Severity.WARNING,
+                    message=f"Line {ext.line_no}: description matches more than one catalogue "
+                            f"product almost equally well (picked {line.product.sku}).",
+                    line_no=ext.line_no,
+                )
+            )
         if line.product is None:
             line.exceptions.append(
                 OrderException(
@@ -119,7 +141,17 @@ def run(
                     )
                 )
             elif line.quantity_t is None:
-                line.quantity_t = round(ext.quantity, 3)  # assume tonnes, unit unknown
+                # Unit stated but not convertible (pieces, bundles, ...):
+                # guessing tonnes here would be silent risk - flag it instead.
+                line.exceptions.append(
+                    OrderException(
+                        code=ExceptionCode.UNIT_UNKNOWN,
+                        severity=Severity.WARNING,
+                        message=f"Line {ext.line_no}: unit {ext.unit!r} cannot be converted to "
+                                "tonnes; quantity needs human interpretation.",
+                        line_no=ext.line_no,
+                    )
+                )
 
         # Price: join with the customer's agreed price list.
         if line.product is not None and customer is not None:
@@ -135,8 +167,12 @@ def run(
                     )
                 )
             elif line.expected_price > 0:
-                delta = (ext.unit_price - line.expected_price) / line.expected_price * 100.0
-                line.price_delta_pct = round(delta, 2)
+                # Round first, then compare: step 4 re-evaluates the stored
+                # rounded value and must reach the same conclusion.
+                delta = round(
+                    (ext.unit_price - line.expected_price) / line.expected_price * 100.0, 2
+                )
+                line.price_delta_pct = delta
                 if abs(delta) > config.price_review_tolerance_pct:
                     severity = (
                         Severity.BLOCKING

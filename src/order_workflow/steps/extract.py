@@ -122,6 +122,18 @@ def _extract_from_tables(doc: NormalizedDocument, tables: list[Table]) -> Extrac
     line_no = 0
     for table in tables:
         mapping = _map_headers(table)
+        # Typed sources (Excel) carry unambiguous numbers: "24.375" is 24.375,
+        # never twenty-four thousand. Only text tables need locale guessing.
+        if table.numeric_source == "machine":
+            def num(raw: str | None) -> float | None:
+                if raw is None:
+                    return None
+                try:
+                    return float(raw)
+                except ValueError:
+                    return parse_number(raw)
+        else:
+            num = parse_number
         for row in table.rows:
             def cell(field: str, row: list[str] = row, mapping: dict[str, int] = mapping) -> str | None:
                 idx = mapping.get(field)
@@ -139,9 +151,9 @@ def _extract_from_tables(doc: NormalizedDocument, tables: list[Table]) -> Extrac
                     line_no=line_no,
                     description=cell("description") or "",
                     sku=cell("sku"),
-                    quantity=parse_number(cell("quantity")),
+                    quantity=num(cell("quantity")),
                     unit=normalize_unit(cell("unit")) or _unit_from_header(table, mapping),
-                    unit_price=parse_number(cell("unit_price")),
+                    unit_price=num(cell("unit_price")),
                     currency=currency,
                     delivery_date=parse_date(cell("delivery_date")),
                     notes=cell("notes"),
@@ -167,12 +179,14 @@ HEADER_PATTERNS = {
     # contain a digit, so prose after "ordine"/"rif" is never mistaken for a
     # reference. "data ordine" (order date) is explicitly excluded.
     "order_ref": re.compile(
-        r"(?<![Dd]ata )(?i:rif(?:erimento)?|ordine\s*(?:di acquisto)?\s*(?:n[.°ro]*)?"
+        r"(?<![Dd][Aa][Tt][Aa] )(?i:rif(?:erimento)?|ordine\s*(?:di acquisto)?\s*(?:n[.°ro]*)?"
         r"|order\s*(?:ref(?:erence)?|no|n[.°]|number)?|po)"
         r"\s*[:.]?\s*((?=[A-Z0-9/-]*\d)[A-Z][A-Z0-9/-]{2,}|\d[A-Z0-9/-]{4,})"
     ),
+    # Label and number must sit on the same line: [ \t] only, never \s.
     "vat": re.compile(
-        r"(?:p\.?\s*iva|vat(?:\s*number)?)\s*[:.]?\s*([A-Z]{0,3}\s?\d[\d\s]{6,})", re.IGNORECASE
+        r"(?:p\.?[ \t]*iva|vat(?:[ \t]*number)?)[ \t]*[:.]?[ \t]*([A-Z]{0,3} ?\d[\d ]{6,})",
+        re.IGNORECASE,
     ),
     # NB: "Spett.le X" names the SUPPLIER (the addressee), never the customer.
     "customer": re.compile(
@@ -219,11 +233,20 @@ def _fill_header_from_text(order: ExtractedOrder, doc: NormalizedDocument) -> No
         if display and "@" not in display:
             order.customer_name = display
     if order.customer_name is None:
-        # Letterhead: the first line naming a company is the ordering party -
-        # skip lines addressed to the supplier ("Spett.le ...").
-        for candidate in text.splitlines()[:6]:
+        # Letterhead: the first line naming a company is the ordering party.
+        # Skip anything addressed to the supplier: a "Spett.le X" line, and -
+        # standard Italian letter layout - the line right after a bare
+        # "Spett.le" salutation.
+        skip_next = False
+        for candidate in text.splitlines()[:8]:
             stripped = candidate.strip()
-            if not stripped or stripped.lower().startswith("spett"):
+            if not stripped:
+                continue
+            if skip_next:
+                skip_next = False
+                continue
+            if stripped.lower().startswith("spett"):
+                skip_next = not COMPANY_SUFFIX.search(stripped)
                 continue
             if COMPANY_SUFFIX.search(stripped):
                 order.customer_name = _clean_company(stripped)
@@ -296,12 +319,14 @@ def _extract_with_llm(doc: NormalizedDocument, llm: LLMClient) -> tuple[Extracte
 
 SKU_TOKEN = re.compile(r"\b([A-Z]{2,4}-[A-Z0-9][A-Z0-9.\-]{1,15})\b")
 QTY_UNIT = re.compile(
-    r"(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*(t|ton[sn]?|tonnellate|kg)\b",
+    r"(\d{1,3}(?:[.,']\d{3})*(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*(t|ton[sn]?|tonnellate|kg)\b",
     re.IGNORECASE,
 )
+# Two alternatives so a plain 4+ digit price ("1745,00") never loses its
+# leading digits to the grouped form.
 PRICE_TOKEN = re.compile(
     r"(?:@|a|al prezzo di|prezzo|price(?:\s+of)?|per)?\s*"
-    r"(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*(?:€|eur|euro)\s*(?:/\s*(?:t|ton))?",
+    r"(\d{1,3}(?:[.,']\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*(?:€|eur|euro)\s*(?:/\s*(?:t|ton))?",
     re.IGNORECASE,
 )
 NOTE_HINT = re.compile(

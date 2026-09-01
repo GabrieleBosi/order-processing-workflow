@@ -43,7 +43,8 @@ and testable.
 ## Quickstart
 
 ```bash
-pip install -e ".[dev]"
+pip install -e ".[dev]"   # editable install: reference data and eval cases
+                          # are read from the repo checkout
 
 # process one order (steps 1-4; nothing is written without confirmation)
 orderflow process data/samples/ordine_email_acciaierie_rossi.eml
@@ -57,8 +58,8 @@ orderflow erp            # see what landed in the ERP
 Optional LLM mode (irregular text extraction + line risk assessment):
 
 ```bash
-cp .env.example .env     # set ANTHROPIC_API_KEY
-export ANTHROPIC_API_KEY=sk-ant-...
+cp .env.example .env     # set ANTHROPIC_API_KEY (a tiny built-in loader reads
+                         # .env from the cwd or repo root; real env vars win)
 orderflow process ...    # picks the model up automatically (claude-opus-5)
 ```
 
@@ -68,10 +69,11 @@ orderflow process ...    # picks the model up automatically (claude-opus-5)
 make eval        # or: orderflow eval
 ```
 
-25 real-shaped cases (clean orders in five formats, Italian/English/German,
+27 real-shaped cases (clean orders in five formats, Italian/English/German,
 decimal-format traps, kg conversions, unknown products/customers, price
-deviations at both thresholds, MOQ, credit limit, duplicate references,
-past delivery dates, quoted-reply noise, prose orders). Each case pins
+deviations at both thresholds and in both directions, MOQ, credit limit,
+duplicate references, past and too-close delivery dates, quoted-reply
+noise, prose orders). Each case pins
 `today`, seeds the ERP when needed, and checks **objectively**: line
 counts, SKUs, quantities, prices, verdicts, exception codes.
 
@@ -86,7 +88,7 @@ judge applies the rubric in `evals/rubric.md`:
 make eval-judge  # needs an API key; judge scores never gate pass/fail
 ```
 
-Current state: deterministic mode passes 24/24 applicable cases (1 case
+Current state: deterministic mode passes 26/26 applicable cases (1 case
 requires the LLM and is skipped without a key).
 
 ## The MVP app
@@ -124,7 +126,7 @@ src/order_workflow/
   web.py + webstatic/  # FastAPI MVP app
 data/reference/        # customers, products, list prices (fictional)
 data/samples/          # 5 sample orders (eml, csv, xlsx, pdf, txt)
-evals/cases/           # 25 cases: input + hand-authored ground truth
+evals/cases/           # 27 cases: input + hand-authored ground truth
 scripts/               # generate_data.py, build_demo.py
 tests/                 # unit + e2e tests (all deterministic)
 ```
@@ -135,8 +137,9 @@ tests/                 # unit + e2e tests (all deterministic)
   a real ERP API (or RPA) plugs in, keeping the confirm gate.
 - OCR is a fallback hook (`pip install -e ".[ocr]"` + tesseract), not
   exercised by the eval set yet.
-- The static demo's in-browser engine covers the deterministic paths only;
-  the LLM lives in the Python backend.
+- The static demo's in-browser engine covers the deterministic paths only
+  and is deliberately simplified (plain-text .eml, unquoted CSV, containment
+  customer matching); the LLM and the full parsers live in the Python backend.
 - With an API key, the next step per the method is component-level error
   analysis on the LLM cases (extraction fidelity first), then tuning the
   eval set with real failure cases.

@@ -688,6 +688,48 @@ def main() -> None:
         },
     )
 
+    # ------------------------------------------------------------- case 26
+    write_case(
+        "case26_price_below_csv", "input.csv",
+        "Customer: SteelTrade GmbH\n"
+        "Order ref: ST-2026-140\n"
+        "Codice;Descrizione;Qta;UM;Prezzo\n"
+        "HRC-S235-3;Hot rolled coils 3mm;40;t;620,00\n"
+        "LAM-S355-8;Heavy plate 8mm;25;t;679,00\n",
+        {
+            "title": "Price BELOW agreement (-3.2%): tolerance is symmetric",
+            "expected": {
+                "customer_id": "C004", "order_ref": "ST-2026-140", "n_lines": 2,
+                "lines": [
+                    {"sku": "HRC-S235-3", "quantity_t": 40.0, "unit_price": 620.00, "verdict": "review"},
+                    {"sku": "LAM-S355-8", "quantity_t": 25.0, "unit_price": 679.00, "verdict": "approve"},
+                ],
+                "order_verdict": "needs_review",
+                "exception_codes": ["PRICE_MISMATCH"],
+            },
+        },
+    )
+
+    # ------------------------------------------------------------- case 27
+    write_case(
+        "case27_short_lead_csv", "input.csv",
+        "Cliente: Costruzioni Ferrari S.p.A.\n"
+        "Rif: CF-ORD-2360\n"
+        "Codice;Descrizione;Qta;UM;Prezzo;Consegna\n"
+        "TRV-IPE-160;Travi IPE 160;20;t;688,75;02/09/2026\n",
+        {
+            "title": "Delivery inside the minimum lead time (2 days)",
+            "expected": {
+                "customer_id": "C003", "order_ref": "CF-ORD-2360", "n_lines": 1,
+                "lines": [
+                    {"sku": "TRV-IPE-160", "quantity_t": 20.0, "unit_price": 688.75, "verdict": "review"},
+                ],
+                "order_verdict": "needs_review",
+                "exception_codes": ["R5_DELIVERY_DATE"],
+            },
+        },
+    )
+
     # --------------------------------------------------------------- samples
     shutil.copy(p_case01, SAMPLES / "ordine_email_acciaierie_rossi.eml")
     shutil.copy(p_case03, SAMPLES / "ordine_csv_costruzioni_ferrari.csv")

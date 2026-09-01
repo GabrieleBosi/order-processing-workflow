@@ -27,9 +27,10 @@ def parse_number(raw: str | float | None) -> float | None:
     """Parse a number in Italian or English notation.
 
     "1.234,50" -> 1234.5   "1,234.50" -> 1234.5   "1234.5" -> 1234.5
-    "1.250" is ambiguous: with exactly three digits after a single dot and
-    no comma we treat the dot as a thousands separator (Italian documents),
-    unless the integer part is 0.
+    A single separator followed by exactly three digits is grouping in both
+    conventions ("1.250" -> 1250, "1,250" -> 1250) unless the integer part
+    is 0. Three-decimal tonnages must arrive typed (Excel) or with an
+    explicit decimal locale to be read as decimals.
     """
     if raw is None:
         return None
@@ -52,12 +53,12 @@ def parse_number(raw: str | float | None) -> float | None:
             # Whichever separator comes last is the decimal mark.
             s = s.replace(".", "").replace(",", ".") if s.rfind(",") > s.rfind(".") else s.replace(",", "")
         elif has_comma:
-            # Comma as decimal mark unless it looks like 1,234,567
+            # Same rule as the dot branch, mirrored: a single comma followed by
+            # exactly three digits is grouping ("1,250 tons" = 1250), not an
+            # Italian decimal, unless the integer part is 0.
             parts = s.split(",")
-            if len(parts) > 2 or (len(parts) == 2 and len(parts[1]) == 3 and len(parts[0]) > 3):
-                s = s.replace(",", "")
-            else:
-                s = s.replace(",", ".")
+            is_thousands = len(parts) == 2 and len(parts[1]) == 3 and parts[0] != "0"
+            s = s.replace(",", "") if (len(parts) > 2 or is_thousands) else s.replace(",", ".")
         elif has_dot:
             parts = s.split(".")
             # "1.234" or "12.345.678" -> thousands separators

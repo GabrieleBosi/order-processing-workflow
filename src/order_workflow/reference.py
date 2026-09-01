@@ -24,6 +24,12 @@ def _norm(s: str) -> str:
 class ReferenceData:
     def __init__(self, reference_dir: Path):
         self.reference_dir = Path(reference_dir)
+        if not (self.reference_dir / "customers.csv").is_file():
+            raise FileNotFoundError(
+                f"Reference data not found in {self.reference_dir}. Run from an editable "
+                "install of the repository (pip install -e .) or point ORDERFLOW_DATA_DIR "
+                "at a directory containing reference/customers.csv and reference/products.csv."
+            )
         # check_same_thread=False: the web app serves requests from a thread
         # pool; access is read-only after loading.
         self.db = sqlite3.connect(":memory:", check_same_thread=False)
@@ -70,7 +76,15 @@ class ReferenceData:
 
     # ------------------------------------------------------------ customers
 
-    def find_customer(self, name: str | None, vat: str | None = None) -> MatchedCustomer | None:
+    def find_customer(
+        self, name: str | None, vat: str | None = None
+    ) -> tuple[MatchedCustomer, float] | None:
+        """Match a customer; returns (customer, confidence).
+
+        VAT and exact/contained names are certain (1.0 / 0.93). A plain fuzzy
+        hit keeps its ratio so step 3 can flag uncertain matches for review
+        instead of silently booking to a similar-sounding company.
+        """
         cur = self.db.cursor()
         if vat:
             row = cur.execute(
@@ -78,7 +92,7 @@ class ReferenceData:
                 (vat.upper().replace(" ", ""),),
             ).fetchone()
             if row:
-                return self._customer(row)
+                return self._customer(row), 1.0
         if not name:
             return None
         target = _norm(name)
@@ -94,7 +108,7 @@ class ReferenceData:
             if score > best_score:
                 best, best_score = row, score
         if best is not None and best_score >= 0.75:
-            return self._customer(best)
+            return self._customer(best), round(best_score, 3)
         return None
 
     @staticmethod
@@ -126,32 +140,59 @@ class ReferenceData:
 
     def search_product_by_description(
         self, description: str
-    ) -> tuple[MatchedProduct, float] | None:
-        """Fuzzy match on product names/aliases. Returns (product, confidence)."""
+    ) -> tuple[MatchedProduct, float, bool] | None:
+        """Fuzzy match on product names/aliases.
+
+        Returns (product, confidence, ambiguous). Two guards keep a
+        wrong-but-similar product from being auto-approved:
+        - digit groups must agree: "tondo 14mm" can never match "tondo 12mm";
+        - a pure string-similarity hit (e.g. HEA 200 vs HEB 200) is capped at
+          0.79 confidence, below step 4's 0.8 review gate - only an exact
+          normalized name/alias or full token coverage scores higher.
+        `ambiguous` is set when a different product scored almost as high.
+        """
         if not description:
             return None
         target = _norm(description)
         target_tokens = set(target.split())
         if not target_tokens:
             return None
+        target_digits = set(re.findall(r"\d+", target))
         cur = self.db.cursor()
         best, best_score = None, 0.0
+        second_score, second_sku = 0.0, None
         for row in cur.execute("SELECT * FROM products").fetchall():
             candidates = [row["name"], row["name_en"]] + [
                 a for a in row["aliases"].split("|") if a.strip()
             ]
+            row_best = 0.0
             for cand in candidates:
                 cn = _norm(cand)
                 if not cn:
                     continue
-                cand_tokens = set(cn.split())
-                overlap = len(target_tokens & cand_tokens) / max(len(cand_tokens), 1)
-                ratio = difflib.SequenceMatcher(None, target, cn).ratio()
-                score = max(ratio, overlap * 0.9)
-                if score > best_score:
-                    best, best_score = row, score
+                cand_digits = set(re.findall(r"\d+", cn))
+                # Sizes/grades conflict when BOTH sides carry digits the other
+                # lacks ("14mm" vs "12mm"); a candidate merely less specific
+                # than the query (or vice versa) is fine.
+                if (cand_digits - target_digits) and (target_digits - cand_digits):
+                    continue
+                if cn == target:
+                    score = 1.0
+                else:
+                    cand_tokens = set(cn.split())
+                    overlap = len(target_tokens & cand_tokens) / max(len(cand_tokens), 1)
+                    ratio = difflib.SequenceMatcher(None, target, cn).ratio()
+                    score = max(min(ratio, 0.79), overlap * 0.9)
+                row_best = max(row_best, score)
+            if row_best > best_score:
+                if best is not None and best["sku"] != row["sku"]:
+                    second_score, second_sku = best_score, best["sku"]
+                best, best_score = row, row_best
+            elif best is not None and row["sku"] != best["sku"] and row_best > second_score:
+                second_score, second_sku = row_best, row["sku"]
         if best is not None and best_score >= 0.55:
-            return self._product(best), round(best_score, 3)
+            ambiguous = second_sku is not None and second_score >= max(0.55, best_score * 0.93)
+            return self._product(best), round(best_score, 3), ambiguous
         return None
 
     @staticmethod

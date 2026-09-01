@@ -177,6 +177,9 @@ def run_evals(
     llm_on = llm is not None
     mode = f"LLM ({config.model})" if llm_on else "deterministic heuristics (no API key)"
     print(f"Eval set: {cases_dir}  |  extraction/check mode: {mode}\n")
+    if judge and not llm_on:
+        print("[!] --judge requested but no LLM credentials are configured: "
+              "the judge will NOT run; only objective checks below.\n")
 
     case_dirs = sorted(d for d in cases_dir.iterdir() if d.is_dir() and (d / "case.json").exists())
     if only_case:
