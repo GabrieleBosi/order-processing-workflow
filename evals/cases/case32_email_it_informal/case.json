@@ -1,0 +1,33 @@
+{
+  "title": "Informal Italian email, list prices (customer has no discount)",
+  "judge": {
+    "focus": "fidelity of an informal, lower-case Italian order email"
+  },
+  "expected": {
+    "customer_id": "C006",
+    "order_ref": "OM-402",
+    "n_lines": 2,
+    "lines": [
+      {
+        "sku": "TRV-HEB-200",
+        "quantity_t": 16.0,
+        "unit_price": 750.0,
+        "verdict": "approve"
+      },
+      {
+        "sku": "RET-EL-6X20",
+        "quantity_t": 8.0,
+        "unit_price": 690.0,
+        "verdict": "approve"
+      }
+    ],
+    "order_verdict": "auto_approve",
+    "absent_exception_codes": [
+      "PRICE_MISMATCH",
+      "UNKNOWN_PRODUCT"
+    ]
+  },
+  "today": "2026-09-01",
+  "category": "multilingual",
+  "input": "input.eml"
+}

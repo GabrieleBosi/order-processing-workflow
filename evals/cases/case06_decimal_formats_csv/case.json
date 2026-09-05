@@ -25,5 +25,6 @@
     ]
   },
   "today": "2026-09-01",
+  "category": "parsing",
   "input": "input.csv"
 }

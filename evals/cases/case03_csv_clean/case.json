@@ -27,5 +27,6 @@
     "order_verdict": "auto_approve"
   },
   "today": "2026-09-01",
+  "category": "clean",
   "input": "input.csv"
 }

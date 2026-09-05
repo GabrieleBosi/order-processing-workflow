@@ -38,8 +38,11 @@ class LLMRefusalError(RuntimeError):
 class LLMClient:
     """Structured-output calls with usage/cost accounting."""
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, model: str | None = None):
         self.config = config
+        # `model` overrides the configured one for this client only: the eval
+        # judge runs on a different model from the pipeline under test.
+        self.model = model or config.model
         self._client = None
 
     def _get_client(self):
@@ -59,7 +62,7 @@ class LLMClient:
             # re-runs the request on a fallback model within the same call.
             try:
                 response = client.beta.messages.parse(
-                    model=self.config.model,
+                    model=self.model,
                     max_tokens=self.config.max_tokens,
                     system=system,
                     messages=[{"role": "user", "content": user}],
@@ -71,7 +74,7 @@ class LLMClient:
                 response = None  # fall through to the plain call
         if response is None:
             response = client.messages.parse(
-                model=self.config.model,
+                model=self.model,
                 max_tokens=self.config.max_tokens,
                 system=system,
                 messages=[{"role": "user", "content": user}],
@@ -84,10 +87,10 @@ class LLMClient:
         return response.parsed_output, usage
 
     def _usage(self, response, duration_ms: float) -> LLMUsage:
-        model = getattr(response, "model", self.config.model)
+        model = getattr(response, "model", self.model)
         input_tokens = getattr(response.usage, "input_tokens", 0) or 0
         output_tokens = getattr(response.usage, "output_tokens", 0) or 0
-        price_in, price_out = MODEL_PRICES.get(model, MODEL_PRICES.get(self.config.model, (5.0, 25.0)))
+        price_in, price_out = MODEL_PRICES.get(model, MODEL_PRICES.get(self.model, (5.0, 25.0)))
         cost = input_tokens / 1e6 * price_in + output_tokens / 1e6 * price_out
         return LLMUsage(
             model=model,
@@ -98,8 +101,8 @@ class LLMClient:
         )
 
 
-def get_llm(config: Config) -> LLMClient | None:
+def get_llm(config: Config, model: str | None = None) -> LLMClient | None:
     """Return a client when LLM mode is enabled, else None (heuristic mode)."""
     if not config.llm_enabled():
         return None
-    return LLMClient(config)
+    return LLMClient(config, model=model)

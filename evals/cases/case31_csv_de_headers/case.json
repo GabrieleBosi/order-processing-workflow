@@ -1,0 +1,31 @@
+{
+  "title": "German column headers in a CSV order",
+  "expected": {
+    "customer_id": "C004",
+    "order_ref": "ST-2026-201",
+    "n_lines": 2,
+    "lines": [
+      {
+        "sku": "HRC-S275-5",
+        "quantity_t": 28.0,
+        "unit_price": 659.6,
+        "verdict": "approve"
+      },
+      {
+        "sku": "TBO-EN10219-60",
+        "quantity_t": 12.0,
+        "unit_price": 722.65,
+        "verdict": "approve"
+      }
+    ],
+    "order_verdict": "auto_approve",
+    "absent_exception_codes": [
+      "PRICE_MISMATCH",
+      "UNKNOWN_PRODUCT",
+      "UNKNOWN_CUSTOMER"
+    ]
+  },
+  "today": "2026-09-01",
+  "category": "multilingual",
+  "input": "input.csv"
+}

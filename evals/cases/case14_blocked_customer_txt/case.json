@@ -1,5 +1,8 @@
 {
   "title": "Blocked customer: order rejected before ERP",
+  "judge": {
+    "focus": "is the ordering party read from the letterhead rather than the addressee?"
+  },
   "expected": {
     "customer_id": "C005",
     "order_ref": "EC-889",
@@ -18,5 +21,6 @@
     ]
   },
   "today": "2026-09-01",
+  "category": "business_rules",
   "input": "input.txt"
 }

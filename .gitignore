@@ -11,3 +11,9 @@ evals/report.json
 .env
 node_modules/
 .DS_Store
+
+# MLflow tracking store and locally generated eval artifacts.
+mlflow.db
+mlruns/
+evals/_artifacts/
+evals/last_run.json

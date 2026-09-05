@@ -1,0 +1,108 @@
+# The acceptance gate for the deterministic configuration: no API key, no model, code and
+# heuristics only. `python -m evals.gate --thresholds evals/thresholds_deterministic.yaml`.
+#
+# Why there are two threshold files
+# ---------------------------------------------------------------------------------------
+# The suite runs in two configurations and they have genuinely different baselines, so one
+# set of numbers cannot gate both honestly:
+#
+#   evals/thresholds.yaml               the shipped configuration, claude-opus-5 in the
+#                                       extraction and check steps. Needs the secret. CI
+#                                       runs it in the `gate` job.
+#   evals/thresholds_deterministic.yaml this file. Table extraction by column mapping, the
+#                                       heuristic text extractor, rule-based checks. Runs
+#                                       anywhere, costs nothing, and is the only gate a
+#                                       pull request from a fork can execute, because forks
+#                                       do not receive secrets. CI runs it in `test`.
+#
+# The rule is the same one stated in thresholds.yaml, applied to the deterministic
+# baseline: hard floor 1.00 for clean and business_rules, baseline minus one case for the
+# rest, floored at 0.00 and rounded down to 2 decimals.
+#
+# Baseline
+# ---------------------------------------------------------------------------------------
+# MLflow run f164735132c84cc9ba5fa636eff3e573, `ORDERFLOW_LLM=stub python -m
+# evals.run_mlflow`, suite version 2, 39 cases of which 38 graded (case25 is marked
+# requires_llm and skips without a key). Measured:
+#
+#   pass_rate 0.7632 (29/38)   clean 1.0000   business_rules 1.0000   parsing 1.0000
+#   master_data 1.0000         multilingual 0.3333   safety 0.1667    p95 31 ms
+#
+# Unlike the LLM gate, this one passes on its baseline. That is the point of having it:
+# while the extraction schema defect keeps the model path red, this file still protects
+# every code path that does work, and a regression in the CSV/Excel extractor or in the
+# business rules turns the build red on the very next push.
+
+split: full_suite
+
+metrics:
+
+  pass_rate:
+    direction: higher_is_better
+    threshold: 0.73
+    why: >-
+      0.7632 minus one case of slack. Whole-suite pass rate over graded cases; the number
+      that moves when anything at all regresses in the no-key configuration.
+
+  pass_rate_clean:
+    direction: higher_is_better
+    threshold: 1.00
+    why: >-
+      Hard floor, no slack. Six well-formed documents in five formats, all currently
+      passing without a model. If one fails, the parsers or the rules broke.
+
+  pass_rate_business_rules:
+    direction: higher_is_better
+    threshold: 1.00
+    why: >-
+      Hard floor, no slack. Price tolerance, MOQ, credit limit, duplicate reference and
+      delivery dates are pure code; they have no excuse to regress and all ten pass today.
+
+  pass_rate_parsing:
+    direction: higher_is_better
+    threshold: 0.85
+    why: >-
+      1.0000 minus one case, on the seven graded without a key. Decimal formats, kg
+      conversion, quoted reply history and fuzzy descriptions all currently pass on the
+      code path, so this is close to a floor in practice.
+
+  pass_rate_master_data:
+    direction: higher_is_better
+    threshold: 0.66
+    why: >-
+      1.0000 minus one case, on three cases. Unknown customer and unknown product must keep
+      being caught and rejected rather than quietly matched to something similar.
+
+  pass_rate_multilingual:
+    direction: higher_is_better
+    threshold: 0.16
+    why: >-
+      0.3333 minus one case. Only the two Italian cases pass: COLUMN_SYNONYMS and the
+      order-reference patterns in steps/extract.py carry Italian and English words only, so
+      the French and German CSV orders extract zero lines. Unlike the LLM gate's 0.00, this
+      line does hold something - it stops the two Italian cases from silently breaking.
+
+  pass_rate_safety:
+    direction: higher_is_better
+    threshold: 0.00
+    why: >-
+      0.1667 minus one case, floored at zero, so this line holds nothing yet. Kept so the
+      metric is named and tracked: only case37 passes today, because its injection sits in
+      a CSV notes column that R6_NOTES_REGULAR surfaces verbatim. It becomes a real
+      threshold the moment injection flagging exists.
+
+  cost_total_usd:
+    direction: lower_is_better
+    threshold: 0.00
+    why: >-
+      Exactly zero, not "under budget". This configuration must make no API calls at all;
+      any cost above zero means a code path reached the model when it was supposed to be
+      running on heuristics, and that is a defect regardless of how little it cost.
+
+  latency_p95_ms:
+    direction: lower_is_better
+    threshold: 5000.0
+    why: >-
+      Measured p95 is 31 ms, so this is a very loose absolute ceiling rather than 3x the
+      baseline: parser timings on a shared CI runner are noisy at the millisecond scale and
+      a tight bound here would flake. The line exists to catch a hang, not to police speed.

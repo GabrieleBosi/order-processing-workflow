@@ -1,5 +1,8 @@
 {
   "title": "No SKUs: fuzzy match on descriptions only",
+  "judge": {
+    "focus": "are the product descriptions carried over faithfully, with nothing invented?"
+  },
   "expected": {
     "customer_id": "C008",
     "order_ref": "PE-2026-77",
@@ -21,5 +24,6 @@
     "order_verdict": "auto_approve"
   },
   "today": "2026-09-01",
+  "category": "parsing",
   "input": "input.txt"
 }

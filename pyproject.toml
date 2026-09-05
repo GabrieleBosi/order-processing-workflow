@@ -23,6 +23,13 @@ dev = [
     "reportlab>=4.0",
     "ruff>=0.4",
 ]
+# The measurement stack: MLflow for run/trace logging, scikit-learn for the
+# judge's Cohen's kappa, PyYAML for the acceptance thresholds.
+mlflow = [
+    "mlflow>=3.4",
+    "scikit-learn>=1.4",
+    "pyyaml>=6.0",
+]
 ocr = [
     "pytesseract>=0.3.10",
     "pdf2image>=1.17",

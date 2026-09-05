@@ -1,5 +1,8 @@
 {
   "title": "Six-line order, one line below MOQ",
+  "judge": {
+    "focus": "all six lines present and in document order, remarks preserved"
+  },
   "expected": {
     "customer_id": "C003",
     "order_ref": "CF-ORD-2415",
@@ -48,5 +51,6 @@
     ]
   },
   "today": "2026-09-01",
+  "category": "parsing",
   "input": "input.eml"
 }

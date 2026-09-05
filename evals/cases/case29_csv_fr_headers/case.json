@@ -1,0 +1,31 @@
+{
+  "title": "French column headers in a CSV order",
+  "expected": {
+    "customer_id": "C010",
+    "order_ref": "FL-2026-77",
+    "n_lines": 2,
+    "lines": [
+      {
+        "sku": "TRV-IPE-160",
+        "quantity_t": 18.0,
+        "unit_price": 714.12,
+        "verdict": "approve"
+      },
+      {
+        "sku": "PRF-UPN-120",
+        "quantity_t": 16.0,
+        "unit_price": 704.27,
+        "verdict": "approve"
+      }
+    ],
+    "order_verdict": "auto_approve",
+    "absent_exception_codes": [
+      "PRICE_MISMATCH",
+      "UNKNOWN_PRODUCT",
+      "UNKNOWN_CUSTOMER"
+    ]
+  },
+  "today": "2026-09-01",
+  "category": "multilingual",
+  "input": "input.csv"
+}

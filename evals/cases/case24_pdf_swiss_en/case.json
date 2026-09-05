@@ -1,5 +1,8 @@
 {
   "title": "Swiss customer PDF in English, VAT lookup",
+  "judge": {
+    "focus": "fidelity of a PDF letterhead order: VAT, reference, both lines"
+  },
   "expected": {
     "customer_id": "C007",
     "order_ref": "BS-7720",
@@ -21,5 +24,6 @@
     "order_verdict": "auto_approve"
   },
   "today": "2026-09-01",
+  "category": "clean",
   "input": "input.pdf"
 }

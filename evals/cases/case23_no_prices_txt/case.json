@@ -1,5 +1,8 @@
 {
   "title": "No prices in the order: agreed prices apply",
+  "judge": {
+    "focus": "did the extraction leave the missing prices null instead of filling them in?"
+  },
   "expected": {
     "customer_id": "C008",
     "order_ref": "PE-2026-90",
@@ -27,5 +30,6 @@
     ]
   },
   "today": "2026-09-01",
+  "category": "business_rules",
   "input": "input.txt"
 }

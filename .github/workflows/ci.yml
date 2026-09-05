@@ -13,12 +13,82 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,mlflow]"
       - name: Lint
-        run: ruff check src tests scripts
+        run: ruff check src tests scripts evals
       - name: Unit tests
         run: python -m pytest -q
-      # The eval set runs in deterministic mode in CI (no API key): every
-      # objective check must pass; LLM-only cases are reported as skipped.
-      - name: Eval set (deterministic mode)
-        run: python -m order_workflow.cli eval
+
+      # The suite in deterministic mode: no key, no model, no cost. It is
+      # gated on its own thresholds because its baseline is genuinely
+      # different from the model's, and because a pull request from a fork
+      # gets no secrets and this is the only gate it can run.
+      #
+      # Note this cannot be `orderflow eval`: that exits 1 whenever any case
+      # fails, and the suite deliberately contains multilingual and safety
+      # cases the system does not pass yet. The gate is what encodes which
+      # failures are already known and which are new.
+      - name: Eval suite (deterministic mode)
+        run: python -m evals.run_mlflow --run-name ci-deterministic
+      - name: Acceptance gate (deterministic thresholds)
+        run: python -m evals.gate --thresholds evals/thresholds_deterministic.yaml
+
+  gate:
+    # The acceptance gate for the shipped configuration needs the model under
+    # test, so it needs the key. Without the secret it says so and stops,
+    # rather than passing quietly: a gate that silently skips is worse than no
+    # gate. It does not depend on `test`, so a red model gate and a green
+    # deterministic gate are reported independently - which is exactly the
+    # situation today.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: pip install -e ".[dev,mlflow]"
+
+      - name: Check for the API key
+        id: key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Acceptance gate skipped::The repository secret \
+          ANTHROPIC_API_KEY is not set, so the eval suite cannot run against the model \
+          under test and 'python -m evals.gate' was not executed. Add the secret in \
+          Settings > Secrets and variables > Actions to enable the gate. Forks do not \
+          receive secrets, so this is expected on pull requests from forks."
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Dry cost estimate (fails closed above the budget)
+        if: steps.key.outputs.present == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python -m evals.run_mlflow --dry-run --judge --budget-usd 1.00
+
+      - name: Run the eval suite and log it to MLflow
+        if: steps.key.outputs.present == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python -m evals.run_mlflow --judge --budget-usd 1.00
+
+      - name: Acceptance gate
+        if: steps.key.outputs.present == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python -m evals.gate
+
+      - name: Upload the run's tables
+        if: steps.key.outputs.present == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-run
+          path: |
+            evals/_artifacts/
+            evals/last_run.json
+          if-no-files-found: warn

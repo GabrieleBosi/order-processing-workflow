@@ -1,5 +1,8 @@
 {
   "title": "Order value exceeds customer credit limit",
+  "judge": {
+    "focus": "fidelity of quantities and prices in a large free-text order"
+  },
   "expected": {
     "customer_id": "C006",
     "order_ref": "OM-355",
@@ -18,5 +21,6 @@
     ]
   },
   "today": "2026-09-01",
+  "category": "business_rules",
   "input": "input.txt"
 }

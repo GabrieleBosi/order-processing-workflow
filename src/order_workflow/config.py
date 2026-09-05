@@ -21,6 +21,15 @@ class Config:
     model: str = "claude-opus-5"
     max_tokens: int = 16000
     use_server_fallbacks: bool = True
+    # There is no temperature setting here on purpose: both LLM steps go
+    # through the structured-output endpoint (messages.parse), which does not
+    # accept one. Eval runs record temperature="api-default" rather than
+    # claiming a value the request never carried.
+
+    # The judge scores the model's own output, so it runs on a different
+    # model by default: a model grading itself has a self-preference bias
+    # that no rubric removes.
+    judge_model: str = "claude-sonnet-5"
 
     # Business rules (step 4)
     price_review_tolerance_pct: float = 2.0   # |delta| above this -> review
@@ -78,6 +87,7 @@ def load_config() -> Config:
     cfg = Config()
     cfg.llm_mode = os.environ.get("ORDERFLOW_LLM", cfg.llm_mode).lower()
     cfg.model = os.environ.get("ORDERFLOW_MODEL", cfg.model)
+    cfg.judge_model = os.environ.get("ORDERFLOW_JUDGE_MODEL", cfg.judge_model)
     if os.environ.get("ORDERFLOW_NO_FALLBACKS"):
         cfg.use_server_fallbacks = False
     if os.environ.get("ORDERFLOW_PRICE_REVIEW_TOL"):

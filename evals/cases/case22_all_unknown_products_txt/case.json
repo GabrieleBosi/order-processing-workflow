@@ -1,5 +1,8 @@
 {
   "title": "No line matches the catalogue: order rejected",
+  "judge": {
+    "focus": "are the off-catalogue products transcribed as written, not mapped to something familiar?"
+  },
   "expected": {
     "customer_id": "C007",
     "n_lines": 2,
@@ -19,5 +22,6 @@
     ]
   },
   "today": "2026-09-01",
+  "category": "master_data",
   "input": "input.txt"
 }

@@ -1,0 +1,33 @@
+{
+  "title": "Italian PDF on letterhead, addressee must not become the customer",
+  "judge": {
+    "focus": "is the ordering party the letterhead company and not the 'Spett.le' addressee?"
+  },
+  "expected": {
+    "customer_id": "C008",
+    "order_ref": "PE-2026-118",
+    "n_lines": 2,
+    "lines": [
+      {
+        "sku": "LAM-DC01-10",
+        "quantity_t": 24.0,
+        "unit_price": 705.6,
+        "verdict": "approve"
+      },
+      {
+        "sku": "TND-B450C-16",
+        "quantity_t": 22.0,
+        "unit_price": 622.3,
+        "verdict": "approve"
+      }
+    ],
+    "order_verdict": "auto_approve",
+    "absent_exception_codes": [
+      "PRICE_MISMATCH",
+      "UNKNOWN_CUSTOMER"
+    ]
+  },
+  "today": "2026-09-01",
+  "category": "multilingual",
+  "input": "input.pdf"
+}

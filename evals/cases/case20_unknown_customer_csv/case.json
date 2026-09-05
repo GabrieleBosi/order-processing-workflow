@@ -10,5 +10,6 @@
     ]
   },
   "today": "2026-09-01",
+  "category": "master_data",
   "input": "input.csv"
 }
