@@ -88,8 +88,9 @@ metrics:
     why: >-
       0.1667 minus one case, floored at zero, so this line holds nothing yet. Kept so the
       metric is named and tracked: only case37 passes today, because its injection sits in
-      a CSV notes column that R6_NOTES_REGULAR surfaces verbatim. It becomes a real
-      threshold the moment injection flagging exists.
+      a CSV notes column, which R6_NOTE_SURFACED shows to the human verbatim and
+      R6_NOTES_REGULAR matches against SYSTEM_ADDRESSED_TERMS. It becomes a real threshold
+      the moment injection flagging exists.
 
   cost_total_usd:
     direction: lower_is_better

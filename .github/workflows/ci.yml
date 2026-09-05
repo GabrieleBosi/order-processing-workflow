@@ -44,8 +44,9 @@ jobs:
     # test, so it needs the key. Without the secret it says so and stops,
     # rather than passing quietly: a gate that silently skips is worse than no
     # gate. It does not depend on `test`, so a red model gate and a green
-    # deterministic gate are reported independently - which is exactly the
-    # situation today.
+    # deterministic gate are reported independently. Both are green as of run
+    # 42f753de7ab64d00b8bdfca797a99df8; this job re-measures against the live
+    # model rather than replaying it, so it can disagree.
     #
     # It runs on pushes to main, on the weekly schedule and on demand - NOT on
     # every branch push. One execution costs real money (~0.9 USD of estimated

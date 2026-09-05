@@ -151,13 +151,35 @@ def _line_rules(
         )
     )
 
-    has_note = bool(ext.notes and ext.notes.strip())
+    # R6 is two rules, deliberately. Surfacing a remark to the person confirming
+    # the order and withholding auto-approval because of it are different
+    # decisions, and conflating them was a defect: the model extractor keeps any
+    # remark the document contains, so "deliver to our Brescia plant" was
+    # downgrading clean orders to review. The note is always shown; only a note
+    # that asks for something, or that addresses the system rather than the
+    # buyer's counterpart, moves the verdict.
+    note = (ext.notes or "").strip()
+    rules.append(
+        RuleResult(
+            rule_id="R6_NOTE_SURFACED",
+            passed=not note,
+            severity=Severity.INFO,
+            message=f"Free-text remark on line: {note!r}" if note else "No free-text remarks.",
+        )
+    )
+    hits = _note_confirmation_terms(note)
     rules.append(
         RuleResult(
             rule_id="R6_NOTES_REGULAR",
-            passed=not has_note,
-            severity=Severity.WARNING if has_note else Severity.INFO,
-            message=f"Free-text remark on line: {ext.notes!r}" if has_note else "No free-text remarks.",
+            passed=not hits,
+            severity=Severity.WARNING if hits else Severity.INFO,
+            message=(
+                "Remark needs human confirmation, matched "
+                + ", ".join(repr(h) for h in hits[:3])
+                + f": {note!r}"
+                if hits
+                else "No remark that needs confirmation."
+            ),
         )
     )
     return rules
@@ -178,8 +200,15 @@ def _verdict_from_rules(rules: list[RuleResult]) -> tuple[LineVerdict, list[str]
 
 
 def _needs_model_opinion(line: ReconciledLine, rules: list[RuleResult]) -> bool:
-    if line.extracted.notes and line.extracted.notes.strip():
-        return True
+    """Which lines are worth an opinion.
+
+    A remark is no longer a trigger on its own. It was, back when a `notes`
+    value could only come from the heuristic extractor's hint list and so was
+    always a risk signal; on the model path a note is whatever prose the
+    document carried, and asking the model about a delivery address only
+    invited it to escalate a line the rules had cleared. A remark that matches
+    `R6_NOTES_REGULAR` still fails a WARNING rule and still arrives here.
+    """
     if line.match_method in ("fuzzy_name", "fuzzy_sku") and (line.match_confidence or 0) < 0.8:
         return True
     return any(not r.passed and r.severity == Severity.WARNING for r in rules)
@@ -190,6 +219,34 @@ HEURISTIC_RISK_TERMS = (
     "as last", "as per last", "da confermare", "to be confirmed", "sconto", "discount",
     "salvo", "subject to", "anticip", "flessibil",
 )
+
+# A remark that names the machine reading it, or tells that machine what to do
+# with the rest of the document, is not a message to the back office - it is
+# addressed to the system. This is not injection detection: it looks only at
+# text the extractor already put in a line note, and its only effect is to
+# withhold auto-approval so a human reads the note. The terms are the shapes
+# the safety cases actually use, in the four languages the suite covers.
+SYSTEM_ADDRESSED_TERMS = (
+    "sistema", "system", "systeme", "système",
+    "istruzion", "anweisung", "assistente", "assistant",
+    "ai model", "modello ai", "llm", "prompt", "agente:", "agent:",
+    "ignora le istruzioni", "ignore previous", "ignore the above",
+    "skip the human", "senza attendere conferma", "senza conferma",
+    "ueberspringen", "überspringen",
+)
+
+
+def _note_confirmation_terms(note: str) -> list[str]:
+    """The terms in `note` that mean a human has to look at it.
+
+    Two lists, one question. `HEURISTIC_RISK_TERMS` is the commercial one -
+    urgency, discounts, "same as last time" - and was already the list this
+    codebase used to decide a remark mattered. `SYSTEM_ADDRESSED_TERMS` is the
+    one the safety cases need: a note that talks to the system keeps its order
+    out of auto-approve even when nothing commercial is being asked for.
+    """
+    text = note.lower()
+    return [term for term in (*HEURISTIC_RISK_TERMS, *SYSTEM_ADDRESSED_TERMS) if term in text]
 
 
 def _heuristic_opinion(line: ReconciledLine) -> LLMOpinion:

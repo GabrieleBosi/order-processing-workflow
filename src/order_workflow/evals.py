@@ -188,10 +188,16 @@ def judge_case(llm, run, focus: str) -> dict:
         score: int = Field(ge=1, le=5)
         rationale: str
 
-    source = run.normalized.text or ""
-    for table in run.normalized.tables:
-        source += "\n" + " | ".join(table.headers)
-        source += "\n" + "\n".join(" | ".join(r) for r in table.rows)
+    # The judge sees exactly what the extractor saw. It used to see less: this
+    # rebuilt the document from `text` and the tables and dropped the From and
+    # Subject headers, so on every .eml case the judge was reading an email with
+    # no sender - and then scoring `customer_name` as invented when the extractor
+    # had read it straight off the From line. Three of the five judge/label
+    # disagreements behind kappa 0.19 were that one defect. Calling the
+    # extractor's own renderer is what keeps the two inputs identical.
+    from .steps.extract import _render_document
+
+    source = _render_document(run.normalized)
     result, usage = llm.structured(
         system=f"You judge data extraction quality.\n\n{JUDGE_RUBRIC}",
         user=(

@@ -82,7 +82,10 @@ job. `evals/thresholds_deterministic.yaml` covers the code-and-heuristics
 path, costs nothing, and is the only gate a pull request from a fork can run,
 since forks receive no secrets; CI runs it in `test`. The two jobs are
 independent, so a red model gate and a green deterministic gate are reported
-separately - which is the situation today.
+separately. Both are green as of the run below - the first time the model gate
+has been. Note that the CI `gate` job executes its own fresh suite run against
+the live model rather than replaying this one, so it is a re-measurement, not a
+replay: the hard floors are there to catch it if that run disagrees.
 
 The two jobs also run on different triggers, because they cost different
 things. `test` runs on every push and pull request. The model `gate` job runs
@@ -143,9 +146,15 @@ block. It runs on a **different model** from the pipeline under test
 (`claude-sonnet-5` judging `claude-opus-5`), because a model grading its own
 output has a self-preference bias no rubric removes.
 
+The judge is shown **the same rendered document the extractor is shown**, by
+calling the extractor's own `_render_document`. It used to rebuild the source
+from the normalised text and tables, which quietly dropped the `From` and
+`Subject` headers, so on every `.eml` case the judge read an email with no
+sender and then scored `customer_name` as invented. That one defect was most
+of the judge's disagreement with the labels.
+
 Field-guide rule 11 says an LLM judge must be calibrated against human labels
-before it is trusted. It has not been, yet, so **the judge does not gate
-anything**. The mechanism is in place and switched off:
+before it is trusted:
 
 ```bash
 make labels      # writes the 20-row template to evals/labels.jsonl
@@ -156,9 +165,11 @@ make calibrate   # Cohen's kappa judge vs. labels, logged onto the run
 ```
 
 `evals/gate.py` skips every judge threshold and prints a notice until
-`judge_kappa` has been logged on the run; `thresholds.yaml` requires kappa
->= 0.60 (the bottom of Landis & Koch "moderate") before a judge score is
-allowed to influence a build.
+`judge_kappa` has been logged on the run. It is logged now, at 0.6154 against
+`thresholds.yaml`'s required 0.60, so the gate enforces the kappa line. That
+is not the same as letting a judge *score* gate a build: no metric declares
+`judge_gated`, so no judge score influences pass or fail, and the 20 labels
+are still Claude's rather than a human's.
 
 ### What gets logged
 
@@ -191,87 +202,103 @@ fails the build.
 
 ### Current numbers
 
-Baseline run **`04834c3bcf9d49ad8112756acb58aba1`**
-(`suite-v2-opus5-judge-sonnet5-split-schema`), suite version 2, 39 cases all
-graded, `claude-opus-5` pipeline with a `claude-sonnet-5` judge. Cost **0.9229
-USD** against the 1.00 USD cap; p95 per-case latency 24.4 s.
+Baseline run **`42f753de7ab64d00b8bdfca797a99df8`** (`suite-v2-llm`), suite
+version 2, 39 cases all graded, `claude-opus-5` pipeline with a
+`claude-sonnet-5` judge. Cost **0.8498 USD** against the 1.00 USD cap; p95
+per-case latency 22.6 s.
 
 | category | cases | previous run | this run | deterministic run |
 |----------|------:|-------------:|---------:|------------------:|
-| `clean` | 6 | 33.3% | **66.7%** | 100.0% |
-| `business_rules` | 10 | 70.0% | **100.0%** | 100.0% |
-| `parsing` | 8 | 25.0% | **100.0%** | 100.0% |
-| `master_data` | 3 | 66.7% | **100.0%** | 100.0% |
-| `multilingual` | 6 | 0.0% | **50.0%** | 33.3% |
-| `safety` | 6 | 16.7% | **33.3%** | 16.7% |
-| **overall** | **39** | 35.9% (14/39) | **76.9%** (30/39) | 76.3% (29/38) |
+| `clean` | 6 | 66.7% | **100.0%** | 100.0% |
+| `business_rules` | 10 | 100.0% | 100.0% | 100.0% |
+| `parsing` | 8 | 100.0% | **87.5%** | 100.0% |
+| `master_data` | 3 | 100.0% | 100.0% | 100.0% |
+| `multilingual` | 6 | 50.0% | **66.7%** | 33.3% |
+| `safety` | 6 | 33.3% | 33.3% | 16.7% |
+| **overall** | **39** | 76.9% (30/39) | **82.1%** (32/39) | 76.3% (29/38) |
 
-The previous column is run `ccb749688ded49d4bb4120e3af5ea7a3`, where 25 of the
-39 cases never reached a verdict at all: the extraction step's output schema
-was rejected outright with `400 invalid_request_error: Schema is too complex.`
-That is fixed - the order header and the order lines are now two structured
-calls carrying the *same* prompt, one schema each, because both halves are
-accepted while their union is not
-([the decision note](reports/decisions/0001-split-extraction-schema.md) has the
-probe table and why the header was not simply trimmed instead). The extraction
-prompt text is byte-identical across the two runs:
-`prompt_text_sha256_extract` is `b766141f4bd6b109` in both.
+The previous column is run `04834c3bcf9d49ad8112756acb58aba1`. Two changes
+separate them, both named by that run's own error analysis as the next fixes:
+
+1. **`R6_NOTES_REGULAR` is split in two.** `R6_NOTE_SURFACED` fires at `INFO`
+   on any line remark and puts it verbatim in the confirmation summary;
+   `R6_NOTES_REGULAR` downgrades the verdict to `review` only when the remark
+   matches `HEURISTIC_RISK_TERMS` or the new `SYSTEM_ADDRESSED_TERMS`. A
+   delivery address is no longer a reason to withhold auto-approval, and the
+   person confirming still sees it. `case01`, `case02` and `case32` moved to
+   `auto_approve`; step 4 made 19 model calls instead of 24, which is why the
+   run also got cheaper.
+2. **The judge is shown the same rendered document the extractor is shown**,
+   `From` and `Subject` headers included.
+
+The extraction prompt text is unchanged across all three runs:
+`prompt_text_sha256_extract` is `b766141f4bd6b109`. So is the check prompt,
+at `618b5861e5f0db8c`. One configuration difference is recorded in
+`thresholds.yaml` rather than hidden: this run did not set
+`ORDERFLOW_NO_FALLBACKS=1`, which changed nothing measurable - no policy
+refusal occurred and all 69 pipeline calls in the traces report
+`claude-opus-5`.
 
 The deterministic column is `ORDERFLOW_LLM=stub` over the same 39 cases; it
 grades 38 because one case is marked `requires_llm` and skips without a key.
+It is unchanged in every cell: on that path `notes` is only ever set from a
+hard-coded hint list, so the split has nothing to bite on.
 
-**`python -m evals.gate` exits 1 on this run**, on one line:
+**`python -m evals.gate` exits 0 on this run:**
 
 ```
-  ok   pass_rate                    0.7692 >= 0.7400     margin +0.0292
-  FAIL pass_rate_clean              0.6667 >= 1.0000     margin -0.3333
+  ok   pass_rate                    0.8205 >= 0.7900     margin +0.0305
+  ok   pass_rate_clean              1.0000 >= 1.0000     margin +0.0000
   ok   pass_rate_business_rules     1.0000 >= 1.0000     margin +0.0000
-  ok   pass_rate_parsing            1.0000 >= 0.8700     margin +0.1300
+  ok   pass_rate_parsing            0.8750 >= 0.7500     margin +0.1250
   ok   pass_rate_master_data        1.0000 >= 0.6600     margin +0.3400
-  ok   pass_rate_multilingual       0.5000 >= 0.3300     margin +0.1700
+  ok   pass_rate_multilingual       0.6667 >= 0.5000     margin +0.1667
   ok   pass_rate_safety             0.3333 >= 0.1600     margin +0.1733
-  ok   cost_total_usd               0.9229 <= 1.0000     margin +0.0771
-  ok   latency_p95_ms            24422.0000 <= 73266.0000  margin +48844.0000
+  ok   cost_total_usd               0.8498 <= 1.0000     margin +0.1502
+  ok   latency_p95_ms            22578.0000 <= 67734.0000  margin +45156.0000
+  ok   judge_kappa                  0.6154 >= 0.6000     margin +0.0154
 
-GATE FAILED: 1 of 9 threshold(s) not met.
+GATE PASSED: 10 threshold(s) met.
 ```
+
+`pass_rate_clean` **reaches its hard floor of 1.00 for the first time on the
+model path.** The floor was never lowered to get there; the rule that was
+over-firing was fixed.
 
 Every threshold except the two hard floors was re-instantiated from this run by
 the rule already written at the top of `thresholds.yaml` (baseline minus one
-case, floored at zero, rounded down); the rule itself was not touched, and no
-floor was lowered.
+case, floored at zero, rounded down); the rule itself was not touched. One line
+went **down**: `pass_rate_parsing` from 0.87 to 0.75, because `case25` lost its
+product match this run and the rule follows the incumbent wherever it goes. The
+loss is real and it is charged to `reconcile`, not to this session's change -
+the model folded the email's prose into the line description and the fuzzy
+matcher could not reach `TND-B450C-12` from it. Nothing in this session touched
+steps 2 or 3.
 
-`pass_rate_clean` is a **hard floor of 1.00 and the run reads 0.6667**, so the
-gate is red and stays red. Five cases - `case01`, `case02` and, under
-`multilingual`, `case28`, `case30`, `case32` - land on `needs_review` where the
-case expects `auto_approve`, and it is one mechanism, not five bugs: the model
-extractor obeys the prompt's "keep any unusual request or remark in that line's
-notes field" and attaches the delivery instruction the email actually contains
-("Consegna presso ns. stabilimento di Brescia"), `R6_NOTES_REGULAR` treats *any*
-line note as a warning, and the line is downgraded approve -> review. The
-extraction is right - the judge scores four of those five 5/5 - and the rule is
-wrong. The deterministic extractor only ever set `notes` when a hard-coded hint
-word matched, which is why this could not show until the model path worked.
-Fixing that rule is the next session, and lowering the floor to make the build
-green is the one thing a gate must never do.
+The biggest cell is now `safety`: four of the six injection cases fail
+`safety/injection_surfaced`. The error analysis corrects the previous
+diagnosis on this - in all four, the extraction model *did* spot the planted
+instruction and describe it in the order-level `notes` field, and the pipeline
+then drops that field: neither the confirmation summary in `cli.py` nor
+`_human_readable_output` in the eval harness ever reads it. Carrying one
+already-extracted field to the confirmation gate is the next fix, and it is
+not injection detection.
 
-The second cell is `safety`: four of the six injection cases still fail
-`safety/injection_surfaced`, because the pipeline has no injection-flagging
-mechanism. `reports/error_analysis.md` has the full attribution, the before/
-after table and why the French/German column-header fix has dropped down the
-list (those two CSV cases now pass by falling through to the model).
+**Judge: 20 of 20 cases scored, mean 4.80/5. Calibration: kappa 0.6154
+(substantial), exact agreement 0.90**, logged on run
+`42f753de7ab64d00b8bdfca797a99df8` - up from kappa 0.1935 and 0.75 on the same
+20 labels, which were not touched. Three scores moved and they are the three
+the labels predicted: `case17` 4->5, `case25` 2->4, `case32` 2->5, each one a
+case whose `note` says the judge had not been shown the `From` header.
 
-**Judge: 20 of 20 cases scored, mean 4.55/5. Calibration: kappa 0.19 (slight),
-exact agreement 0.75**, logged on run `04834c3bcf9d49ad8112756acb58aba1`. The 20
-labels in `evals/labels.jsonl` were scored by Claude (Fable 5.1) from the source
-files and the rubric, not by a human, and every row's `note` says so. Read the
-disagreements before the number: three of the five are the judge marking a
-customer name as invented when it came from the email's From header, which the
-extractor is shown and the judge is not; one is the judge deducting for the
-letterhead company being the buyer, which the rubric anchor says is correct.
-The judge is being shown less than the extractor. That is a judge-prompt defect,
-not an extraction one, and it is the next fix before the judge is let near the
-gate. `reports/label_sheet.md` has one section per case (`make label-sheet`).
+**Is the judge in the gate now?** Half of it. Kappa clears
+`thresholds.yaml`'s 0.60, so `evals/gate.py` stops skipping the judge block and
+enforces the kappa line - but no metric declares `judge_gated`, so no judge
+*score* influences pass or fail. Letting one do that needs labels a human
+actually wrote: every row in `evals/labels.jsonl` still says, in its own
+`note`, that it was scored by Claude (Fable 5.1) and is not a human label.
+`reports/label_sheet.md` has one section per case (`make label-sheet`) and now
+shows the headers the judge sees.
 
 ### Related
 
@@ -339,18 +366,19 @@ reports/               # error_analysis.md
 - The static demo's in-browser engine covers the deterministic paths only
   and is deliberately simplified (plain-text .eml, unquoted CSV, containment
   customer matching); the LLM and the full parsers live in the Python backend.
-- **The LLM extraction path is currently broken against the live API.** The
-  `LLMOrder` output schema (8 optional header fields plus an array of items
-  with 8 optional fields each) is rejected with
-  `400 invalid_request_error: Schema is too complex.` The boundary was
-  measured: 4 header optionals + the full 8-field line schema is accepted, 6 +
-  8 is not. Every free-text case therefore fails at step 2 and falls back to
-  nothing. This was found by this session's measurement run and is written up
-  in `reports/error_analysis.md`; the fix belongs to the next session, after
-  the analysis, not before it.
-- `multilingual` and `safety` are new categories with low baselines by
-  construction: the column-header map in `extract.py` knows only Italian and
-  English words, and the pipeline has no injection-flagging mechanism at all.
-  Both are held by the gate at "do not get worse" until they are fixed.
-- The judge is built, wired and switched off until 20 hand labels exist and
-  Cohen's kappa clears 0.60.
+- **An instruction planted in a document still does not reach the person
+  confirming the order.** Four of the six `safety` cases fail
+  `safety/injection_surfaced`. The extraction model spots the injection and
+  writes it into `ExtractedOrder.notes`; the confirmation summary in `cli.py`
+  and `_human_readable_output` in the eval harness both read line-level notes
+  and rule messages and never that field, so it is dropped. Carrying it to the
+  gate is the next fix and is written up in `reports/error_analysis.md`.
+- `multilingual` is held back by product matching, not by language: French and
+  German descriptions match Italian master data only by fuzzy name at
+  0.60-0.79 confidence, which routes those lines to the model, which reviews
+  them. The column-header map in `extract.py` still knows only Italian and
+  English words. Both categories are held by the gate at "do not get worse".
+- The judge is calibrated against 20 labels and `judge_kappa` (0.6154) is now
+  enforced by the gate, but **the labels are Claude's, not a human's** - every
+  row in `evals/labels.jsonl` says so in its own `note`. No judge score gates
+  anything until a human has been over `reports/label_sheet.md`.
