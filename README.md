@@ -261,11 +261,17 @@ mechanism. `reports/error_analysis.md` has the full attribution, the before/
 after table and why the French/German column-header fix has dropped down the
 list (those two CSV cases now pass by falling through to the model).
 
-**Judge: 20 of 20 cases scored, mean 4.55/5.** `judge_kappa` is still unlogged,
-so the judge still gates nothing. `reports/label_sheet.md` now holds one section
-per judge case - the source document, the extraction from this run, and the
-judge's score and rationale - which is what the hand labels in
-`evals/labels.jsonl` get filled in from (`make label-sheet`).
+**Judge: 20 of 20 cases scored, mean 4.55/5. Calibration: kappa 0.19 (slight),
+exact agreement 0.75**, logged on run `04834c3bcf9d49ad8112756acb58aba1`. The 20
+labels in `evals/labels.jsonl` were scored by Claude (Fable 5.1) from the source
+files and the rubric, not by a human, and every row's `note` says so. Read the
+disagreements before the number: three of the five are the judge marking a
+customer name as invented when it came from the email's From header, which the
+extractor is shown and the judge is not; one is the judge deducting for the
+letterhead company being the buyer, which the rubric anchor says is correct.
+The judge is being shown less than the extractor. That is a judge-prompt defect,
+not an extraction one, and it is the next fix before the judge is let near the
+gate. `reports/label_sheet.md` has one section per case (`make label-sheet`).
 
 ### Related
 
