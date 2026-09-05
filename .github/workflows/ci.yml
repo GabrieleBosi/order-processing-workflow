@@ -3,6 +3,12 @@ name: CI
 on:
   push:
   pull_request:
+  schedule:
+    # Weekly, Monday 04:00 UTC. The model gate is the only job that needs it:
+    # the suite can change score without a commit, because the model, the API
+    # and the documents' own difficulty are not pinned by this repository.
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
 
 jobs:
   test:
@@ -40,6 +46,18 @@ jobs:
     # gate. It does not depend on `test`, so a red model gate and a green
     # deterministic gate are reported independently - which is exactly the
     # situation today.
+    #
+    # It runs on pushes to main, on the weekly schedule and on demand - NOT on
+    # every branch push. One execution costs real money (~0.9 USD of estimated
+    # budget) and a couple of minutes of API calls, so paying it on every push
+    # of a work-in-progress branch buys nothing: the deterministic job in
+    # `test` runs everywhere and catches code regressions for free. Push to
+    # main, wait for the weekly run, or trigger it by hand from the Actions
+    # tab (`workflow_dispatch`) when a branch actually needs the model gate.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

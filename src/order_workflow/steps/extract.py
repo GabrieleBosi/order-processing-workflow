@@ -65,7 +65,27 @@ class LLMLine(BaseModel):
     notes: str | None = Field(default=None, description="Free-text remarks attached to this line")
 
 
-class LLMOrder(BaseModel):
+# The extraction schema is split in two, and the split is not cosmetic: the
+# combined model (8 optional header fields *plus* the line array) is rejected
+# outright by the structured-output endpoint with
+#
+#     400 invalid_request_error: Schema is too complex.
+#
+# Every optional field is an `anyOf` branch in the emitted JSON Schema, and the
+# limit is on the total. Measured against claude-opus-5 (probe table in
+# reports/decisions/0001-split-extraction-schema.md): header-only with all 8
+# optionals is accepted, the line array alone is accepted, 4 header optionals +
+# the line array is accepted, 6 + 8 and the shipped 8 + 8 are rejected.
+#
+# So the header and the lines are asked for in two calls that carry the *same*
+# system prompt and the *same* user message, and differ only in the output
+# schema. That keeps every extracted fact - trimming the header to fit one call
+# would have cost order_date, currency, language and the order-level notes.
+
+
+class LLMOrderHeader(BaseModel):
+    """Order header, asked for on its own (8 optionals, flat: accepted)."""
+
     customer_name: str | None = Field(default=None, description="Ordering company name")
     customer_vat: str | None = Field(default=None, description="VAT number if present")
     order_ref: str | None = Field(default=None, description="Customer order/PO reference")
@@ -76,6 +96,11 @@ class LLMOrder(BaseModel):
     currency: str | None = Field(default=None, description="Order currency, e.g. EUR")
     language: str | None = Field(default=None, description="Document language code, e.g. it, en")
     notes: str | None = Field(default=None, description="Order-level free-text remarks")
+
+
+class LLMOrderLines(BaseModel):
+    """The order lines, asked for on their own (array of 8-field items: accepted)."""
+
     lines: list[LLMLine] = Field(default_factory=list)
 
 
@@ -282,23 +307,33 @@ def _render_document(doc: NormalizedDocument) -> str:
 
 
 def _extract_with_llm(doc: NormalizedDocument, llm: LLMClient) -> tuple[ExtractedOrder, LLMUsage]:
-    raw, usage = llm.structured(
-        system=EXTRACTION_SYSTEM,
-        user=f"Extract the purchase order from this document:\n\n{_render_document(doc)}",
-        output_model=LLMOrder,
+    """Two calls, one schema each; see the note above the schema definitions.
+
+    Both calls carry the same system prompt and the same user message, and the
+    message is byte-identical to the one the single-call version sent: only
+    `output_model` differs. That is what keeps `prompt_text_sha256_extract`
+    stable across this change.
+    """
+    prompt = f"Extract the purchase order from this document:\n\n{_render_document(doc)}"
+    header, usage = llm.structured(
+        system=EXTRACTION_SYSTEM, user=prompt, output_model=LLMOrderHeader
     )
+    body, body_usage = llm.structured(
+        system=EXTRACTION_SYSTEM, user=prompt, output_model=LLMOrderLines
+    )
+    usage.add(body_usage)
     order = ExtractedOrder(
-        customer_name=raw.customer_name,
-        customer_vat=re.sub(r"\s", "", raw.customer_vat) if raw.customer_vat else None,
-        order_ref=raw.order_ref,
-        order_date=parse_date(raw.order_date),
-        delivery_date=parse_date(raw.delivery_date),
-        currency=parse_currency(raw.currency) or "EUR",
-        language=raw.language,
-        notes=raw.notes,
+        customer_name=header.customer_name,
+        customer_vat=re.sub(r"\s", "", header.customer_vat) if header.customer_vat else None,
+        order_ref=header.order_ref,
+        order_date=parse_date(header.order_date),
+        delivery_date=parse_date(header.delivery_date),
+        currency=parse_currency(header.currency) or "EUR",
+        language=header.language,
+        notes=header.notes,
         extraction_method="llm",
     )
-    for i, line in enumerate(raw.lines, start=1):
+    for i, line in enumerate(body.lines, start=1):
         order.lines.append(
             ExtractedLine(
                 line_no=i,

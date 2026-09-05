@@ -132,3 +132,61 @@ def test_spettle_two_line_salutation_skipped():
         "Spett.le\nDuferco Commerciale S.p.A.\n\nAcme Steel S.r.l.\n- 25 t tondo 12mm a 620 \u20ac/t\n"
     ))
     assert order.customer_name == "Acme Steel S.r.l."
+
+
+# --------------------------------------------------------------- LLM path
+
+
+class _FakeLLM:
+    """Records every structured() call and answers by requested schema.
+
+    The extraction step asks for the header and the lines separately because
+    the combined schema is rejected by the API as too complex; this fake is
+    what pins that shape in a test that costs nothing.
+    """
+
+    def __init__(self):
+        self.calls = []
+
+    def structured(self, system, user, output_model):
+        from order_workflow.models import LLMUsage
+
+        self.calls.append({"system": system, "user": user, "schema": output_model.__name__})
+        if output_model is extract.LLMOrderHeader:
+            parsed = extract.LLMOrderHeader(
+                customer_name="Acme Steel S.r.l.", customer_vat="IT 01234 567890",
+                order_ref="PO-2026-4501", order_date="2026-09-01",
+                delivery_date="2026-10-15", currency="EUR", language="it",
+                notes="consegna unica",
+            )
+        else:
+            parsed = extract.LLMOrderLines(lines=[
+                extract.LLMLine(description="Tondo B450C 12mm", sku="TND-B450C-12",
+                                quantity=25.0, unit="t", unit_price=614.4, currency="EUR",
+                                notes="urgente"),
+            ])
+        return parsed, LLMUsage(model="test-model", calls=1, input_tokens=100,
+                                output_tokens=50, cost_usd=0.001)
+
+
+def test_llm_path_asks_for_header_and_lines_separately():
+    llm = _FakeLLM()
+    order, usage = extract.run(_doc("Acme Steel S.r.l.\nordine a voce\n"), Config(), llm=llm)
+
+    assert [c["schema"] for c in llm.calls] == ["LLMOrderHeader", "LLMOrderLines"]
+    # Same prompt both times: the split is in the schema, never in the wording.
+    assert llm.calls[0]["system"] == llm.calls[1]["system"] == extract.EXTRACTION_SYSTEM
+    assert llm.calls[0]["user"] == llm.calls[1]["user"]
+
+    # Every header fact survives the split, and both calls are billed.
+    assert order.extraction_method == "llm"
+    assert order.customer_name == "Acme Steel S.r.l."
+    assert order.customer_vat == "IT01234567890"
+    assert order.order_ref == "PO-2026-4501"
+    assert str(order.order_date) == "2026-09-01"
+    assert str(order.delivery_date) == "2026-10-15"
+    assert order.currency == "EUR"
+    assert order.language == "it"
+    assert order.notes == "consegna unica"
+    assert len(order.lines) == 1 and order.lines[0].sku == "TND-B450C-12"
+    assert usage.calls == 2 and usage.cost_usd == 0.002

@@ -82,9 +82,14 @@ def estimate_cost(config, cases_dir: Path, judge: bool) -> dict:
 
         has_table = any(extract_step.table_is_order_table(t) for t in doc.tables)
         if not has_table:
-            calls["extract"] += 1
-            tokens_in += (len(EXTRACTION_SYSTEM) + len(rendered)) / CHARS_PER_TOKEN
-            tokens_out += 120 + 90 * n_lines
+            # Step 2 makes TWO calls per document without an order table - the
+            # header and the lines, same prompt, one output schema each,
+            # because the combined schema is rejected as too complex (see
+            # steps/extract.py). Both calls carry the whole document, so the
+            # input is counted twice.
+            calls["extract"] += 2
+            tokens_in += 2 * (len(EXTRACTION_SYSTEM) + len(rendered)) / CHARS_PER_TOKEN
+            tokens_out += 120 + (120 + 90 * n_lines)
 
         # Step 4 asks the model only about irregular lines. We cannot know
         # which before running, so the estimate assumes every line is one.

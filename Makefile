@@ -1,5 +1,5 @@
 .PHONY: install test eval eval-judge serve demo erp lint data \
-        eval-mlflow eval-estimate gate gate-deterministic labels calibrate \
+        eval-mlflow eval-estimate gate gate-deterministic labels label-sheet calibrate \
         analysis analysis-baseline mlflow-ui
 
 install:
@@ -56,6 +56,11 @@ gate-deterministic:
 # Write the 20-row hand-label template (never clobbers labels already filled in).
 labels:
 	python -m evals.make_labels_template
+
+# The sheet the labels are filled in FROM: per judge case, the source document,
+# this run's extraction and the judge's score, straight out of the run's trace.
+label-sheet:
+	python -m evals.label_sheet
 
 # Cohen's kappa, judge vs. hand labels, logged onto the run.
 calibrate:

@@ -72,6 +72,7 @@ make eval-mlflow     # the full suite into one logged MLflow run, with traces
 make gate            # fail below any per-category acceptance threshold
 make gate-deterministic   # the same gate for the no-key configuration
 make analysis        # reports/error_analysis.md from the last logged run
+make label-sheet     # reports/label_sheet.md: what the human labels are filled in from
 ```
 
 The suite runs in two configurations with genuinely different baselines, so
@@ -82,6 +83,14 @@ path, costs nothing, and is the only gate a pull request from a fork can run,
 since forks receive no secrets; CI runs it in `test`. The two jobs are
 independent, so a red model gate and a green deterministic gate are reported
 separately - which is the situation today.
+
+The two jobs also run on different triggers, because they cost different
+things. `test` runs on every push and pull request. The model `gate` job runs
+**only on pushes to `main`, on a weekly schedule (Mondays 04:00 UTC) and on
+`workflow_dispatch`**: one execution spends most of a 1 USD budget and a few
+minutes of API calls, which is not worth paying on every push of a
+work-in-progress branch. Trigger it by hand from the Actions tab when a branch
+needs it.
 
 ### The case set
 
@@ -140,7 +149,9 @@ anything**. The mechanism is in place and switched off:
 
 ```bash
 make labels      # writes the 20-row template to evals/labels.jsonl
-# fill in "human_score" by hand against the rubric
+make label-sheet # reports/label_sheet.md: per case, the document, the extraction
+                 # and the judge's score, straight out of the run's trace
+# fill in "human_score" by hand against the rubric, reading the sheet
 make calibrate   # Cohen's kappa judge vs. labels, logged onto the run
 ```
 
@@ -180,60 +191,81 @@ fails the build.
 
 ### Current numbers
 
-Baseline run **`ccb749688ded49d4bb4120e3af5ea7a3`**
-(`suite-v2-opus5-judge-sonnet5`), suite version 2, 39 cases, `claude-opus-5`
-pipeline with a `claude-sonnet-5` judge. Cost **0.0726 USD** against the
-1.00 USD cap; p95 per-case latency 91.7 s.
+Baseline run **`04834c3bcf9d49ad8112756acb58aba1`**
+(`suite-v2-opus5-judge-sonnet5-split-schema`), suite version 2, 39 cases all
+graded, `claude-opus-5` pipeline with a `claude-sonnet-5` judge. Cost **0.9229
+USD** against the 1.00 USD cap; p95 per-case latency 24.4 s.
 
-| category | cases | LLM run | deterministic run |
-|----------|------:|--------:|------------------:|
-| `clean` | 6 | 33.3% | 100.0% |
-| `business_rules` | 10 | 70.0% | 100.0% |
-| `parsing` | 8 | 25.0% | 100.0% |
-| `master_data` | 3 | 66.7% | 100.0% |
-| `multilingual` | 6 | 0.0% | 33.3% |
-| `safety` | 6 | 16.7% | 16.7% |
-| **overall** | **39** | **35.9%** (14/39) | **76.3%** (29/38) |
+| category | cases | previous run | this run | deterministic run |
+|----------|------:|-------------:|---------:|------------------:|
+| `clean` | 6 | 33.3% | **66.7%** | 100.0% |
+| `business_rules` | 10 | 70.0% | **100.0%** | 100.0% |
+| `parsing` | 8 | 25.0% | **100.0%** | 100.0% |
+| `master_data` | 3 | 66.7% | **100.0%** | 100.0% |
+| `multilingual` | 6 | 0.0% | **50.0%** | 33.3% |
+| `safety` | 6 | 16.7% | **33.3%** | 16.7% |
+| **overall** | **39** | 35.9% (14/39) | **76.9%** (30/39) | 76.3% (29/38) |
+
+The previous column is run `ccb749688ded49d4bb4120e3af5ea7a3`, where 25 of the
+39 cases never reached a verdict at all: the extraction step's output schema
+was rejected outright with `400 invalid_request_error: Schema is too complex.`
+That is fixed - the order header and the order lines are now two structured
+calls carrying the *same* prompt, one schema each, because both halves are
+accepted while their union is not
+([the decision note](reports/decisions/0001-split-extraction-schema.md) has the
+probe table and why the header was not simply trimmed instead). The extraction
+prompt text is byte-identical across the two runs:
+`prompt_text_sha256_extract` is `b766141f4bd6b109` in both.
 
 The deterministic column is `ORDERFLOW_LLM=stub` over the same 39 cases; it
 grades 38 because one case is marked `requires_llm` and skips without a key.
 
-**`python -m evals.gate` currently exits 1** on this run, failing
-`pass_rate_clean` and `pass_rate_business_rules`, both of which are hard
-floors of 1.00 written into `thresholds.yaml` before the run existed.
-
-That is the correct outcome, and the reason is a single defect rather than
-25 quality problems. The extraction step's output schema is rejected by the
-API outright:
+**`python -m evals.gate` exits 1 on this run**, on one line:
 
 ```
-400 invalid_request_error: Schema is too complex.
+  ok   pass_rate                    0.7692 >= 0.7400     margin +0.0292
+  FAIL pass_rate_clean              0.6667 >= 1.0000     margin -0.3333
+  ok   pass_rate_business_rules     1.0000 >= 1.0000     margin +0.0000
+  ok   pass_rate_parsing            1.0000 >= 0.8700     margin +0.1300
+  ok   pass_rate_master_data        1.0000 >= 0.6600     margin +0.3400
+  ok   pass_rate_multilingual       0.5000 >= 0.3300     margin +0.1700
+  ok   pass_rate_safety             0.3333 >= 0.1600     margin +0.1733
+  ok   cost_total_usd               0.9229 <= 1.0000     margin +0.0771
+  ok   latency_p95_ms            24422.0000 <= 73266.0000  margin +48844.0000
+
+GATE FAILED: 1 of 9 threshold(s) not met.
 ```
 
-`LLMOrder` carries 8 optional header fields plus an array of items with 8
-optional fields each. The boundary was measured with probe calls: 4 header
-optionals + the full 8-field line schema is accepted, 6 + 8 is not. So every
-case whose extraction goes through the model - every email, text note and
-PDF - dies at step 2, which is why `clean` reads 33.3% here and 100%
-deterministically. The 14 that pass are exactly the CSV and Excel cases,
-which extract by column mapping in code and never call the model.
+Every threshold except the two hard floors was re-instantiated from this run by
+the rule already written at the top of `thresholds.yaml` (baseline minus one
+case, floored at zero, rounded down); the rule itself was not touched, and no
+floor was lowered.
 
-The cheapest fix is to drop two unused optional header fields and re-run;
-`reports/error_analysis.md` has the full attribution, the probe table and
-the falsification test. It is deliberately **not** applied here - this
-session measures, and a fix chosen and applied in the same breath is a fix
-nobody measured.
+`pass_rate_clean` is a **hard floor of 1.00 and the run reads 0.6667**, so the
+gate is red and stays red. Five cases - `case01`, `case02` and, under
+`multilingual`, `case28`, `case30`, `case32` - land on `needs_review` where the
+case expects `auto_approve`, and it is one mechanism, not five bugs: the model
+extractor obeys the prompt's "keep any unusual request or remark in that line's
+notes field" and attaches the delivery instruction the email actually contains
+("Consegna presso ns. stabilimento di Brescia"), `R6_NOTES_REGULAR` treats *any*
+line note as a warning, and the line is downgraded approve -> review. The
+extraction is right - the judge scores four of those five 5/5 - and the rule is
+wrong. The deterministic extractor only ever set `notes` when a hard-coded hint
+word matched, which is why this could not show until the model path worked.
+Fixing that rule is the next session, and lowering the floor to make the build
+green is the one thing a gate must never do.
 
-Once the blocker is cleared, the two findings that remain are the real work:
-the column-header map and order-reference patterns in `steps/extract.py`
-carry Italian and English words only (French and German CSV orders extract
-**zero** lines), and five of the six safety cases fail
-`safety/injection_surfaced` because nothing in the pipeline surfaces a
-planted instruction to the human at the confirmation gate.
+The second cell is `safety`: four of the six injection cases still fail
+`safety/injection_surfaced`, because the pipeline has no injection-flagging
+mechanism. `reports/error_analysis.md` has the full attribution, the before/
+after table and why the French/German column-header fix has dropped down the
+list (those two CSV cases now pass by falling through to the model).
 
-**Judge kappa: awaiting labels.** `evals/labels.jsonl` has its 20 rows and no
-`human_score` values yet, so `judge_kappa` has never been logged and the gate
-prints `judge thresholds NOT enforced` and skips them.
+**Judge: 20 of 20 cases scored, mean 4.55/5.** `judge_kappa` is still unlogged,
+so the judge still gates nothing. `reports/label_sheet.md` now holds one section
+per judge case - the source document, the extraction from this run, and the
+judge's score and rationale - which is what the hand labels in
+`evals/labels.jsonl` get filled in from (`make label-sheet`).
 
 ### Related
 

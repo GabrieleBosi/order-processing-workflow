@@ -10,10 +10,12 @@ per step.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import math
 import re
 import statistics
+import sys
 from contextlib import contextmanager
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -246,6 +248,27 @@ def _null_case_context(case_id: str, spec: dict):
     yield
 
 
+def _make_console_lossless() -> None:
+    """Never let an unprintable character end a paid run.
+
+    The judge writes free text, and models use characters a Windows console
+    cannot encode: its default codec here is cp1252, so a single arrow in a
+    rationale makes `print` raise UnicodeEncodeError. That is not a cosmetic
+    failure - it propagates out of the case loop and takes the whole suite
+    with it. It happened on 2026-09-05: a run died 25 cases and 0.59 USD in,
+    on `\\u2192` in one judge rationale, and every metric of that run was lost.
+
+    So the streams are switched to replacing what they cannot encode. Nothing
+    is hidden by this: the full text is written to report.json as UTF-8 and
+    recorded verbatim on the MLflow trace either way.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        # Not every stream is a reconfigurable text stream (pytest's capture
+        # object, for one); where it is not, printing was never the risk.
+        with contextlib.suppress(AttributeError, ValueError):
+            stream.reconfigure(errors="replace")
+
+
 def run_evals(
     config: Config,
     cases_dir: Path | None = None,
@@ -264,6 +287,7 @@ def run_evals(
     runner uses it to open one trace span per case without this module
     having to know about MLflow.
     """
+    _make_console_lossless()
     cases_dir = Path(cases_dir or DEFAULT_CASES_DIR)
     case_context = case_context or _null_case_context
     reference = ReferenceData(config.reference_dir)
