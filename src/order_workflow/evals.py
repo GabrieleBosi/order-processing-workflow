@@ -26,6 +26,7 @@ from .llm import get_llm
 from .models import OrderVerdict, RunStatus
 from .pipeline import Pipeline
 from .reference import ReferenceData
+from .steps.extract import _render_document
 
 DEFAULT_CASES_DIR = REPO_ROOT / "evals" / "cases"
 DEFAULT_REPORT = REPO_ROOT / "evals" / "report.json"
@@ -195,8 +196,6 @@ def judge_case(llm, run, focus: str) -> dict:
     # had read it straight off the From line. Three of the five judge/label
     # disagreements behind kappa 0.19 were that one defect. Calling the
     # extractor's own renderer is what keeps the two inputs identical.
-    from .steps.extract import _render_document
-
     source = _render_document(run.normalized)
     result, usage = llm.structured(
         system=f"You judge data extraction quality.\n\n{JUDGE_RUBRIC}",
