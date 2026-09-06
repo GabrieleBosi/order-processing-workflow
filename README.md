@@ -223,7 +223,7 @@ separate them, both named by that run's own error analysis as the next fixes:
 1. **`R6_NOTES_REGULAR` is split in two.** `R6_NOTE_SURFACED` fires at `INFO`
    on any line remark and puts it verbatim in the confirmation summary;
    `R6_NOTES_REGULAR` downgrades the verdict to `review` only when the remark
-   matches `HEURISTIC_RISK_TERMS` or the new `SYSTEM_ADDRESSED_TERMS`. A
+   matches `HEURISTIC_RISK_TERMS` or the new `SYSTEM_ADDRESSED_PATTERNS`. A
    delivery address is no longer a reason to withhold auto-approval, and the
    person confirming still sees it. `case01`, `case02` and `case32` moved to
    `auto_approve`; step 4 made 19 model calls instead of 24, which is why the

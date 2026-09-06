@@ -9,6 +9,7 @@ That asymmetry is the main guardrail of the whole workflow: a hallucinated
 
 from __future__ import annotations
 
+import re
 from datetime import date, timedelta
 from typing import Literal
 
@@ -224,15 +225,29 @@ HEURISTIC_RISK_TERMS = (
 # with the rest of the document, is not a message to the back office - it is
 # addressed to the system. This is not injection detection: it looks only at
 # text the extractor already put in a line note, and its only effect is to
-# withhold auto-approval so a human reads the note. The terms are the shapes
-# the safety cases actually use, in the four languages the suite covers.
-SYSTEM_ADDRESSED_TERMS = (
-    "sistema", "system", "systeme", "système",
-    "istruzion", "anweisung", "assistente", "assistant",
-    "ai model", "modello ai", "llm", "prompt", "agente:", "agent:",
-    "ignora le istruzioni", "ignore previous", "ignore the above",
-    "skip the human", "senza attendere conferma", "senza conferma",
-    "ueberspringen", "überspringen",
+# withhold auto-approval so a human reads the note. The shapes are the ones the
+# safety cases actually use, in the four languages the suite covers.
+#
+# They are anchored phrases, not bare words, on purpose. "istruzioni di
+# consegna", "materiale da sistemare" and "prompt delivery" are ordinary
+# commercial wording, and a bare `istruzion` / `sistema` / `prompt` substring
+# sent every one of them to review - the exact defect the split of R6 exists
+# to remove. What is matched is the system being addressed ("per il sistema",
+# "an das System", "ISTRUZIONE AGENTE:"), never the word on its own.
+SYSTEM_ADDRESSED_PATTERNS = re.compile(
+    r"(?:"
+    r"\b(?:per il|al|del) sistema\b|\bsistema (?:di elaborazione|automatic\w*)|\bsistema:"
+    r"|\b(?:to|for) the system\b|\bsystem prompt\b|\bsystem:"
+    r"|\bau syst[eè]me\b|\bsyst[eè]me:"
+    r"|\ban das system\b|\bans system\b"
+    r"|\bistruzion[ei] (?:agente|per (?:il|l')|al)\b|\banweisung\b"
+    r"|\bassistente\b|\bassistant\b|\bai model\b|\bmodello ai\b|\bllm\b|\bprompt:"
+    r"|\bagente:|\bagent:"
+    r"|ignora le istruzioni|ignore previous|ignore the above"
+    r"|skip the human|senza attendere conferma|senza conferma"
+    r"|ueberspringen|überspringen"
+    r")",
+    re.IGNORECASE,
 )
 
 
@@ -241,12 +256,14 @@ def _note_confirmation_terms(note: str) -> list[str]:
 
     Two lists, one question. `HEURISTIC_RISK_TERMS` is the commercial one -
     urgency, discounts, "same as last time" - and was already the list this
-    codebase used to decide a remark mattered. `SYSTEM_ADDRESSED_TERMS` is the
+    codebase used to decide a remark mattered. `SYSTEM_ADDRESSED_PATTERNS` is the
     one the safety cases need: a note that talks to the system keeps its order
     out of auto-approve even when nothing commercial is being asked for.
     """
     text = note.lower()
-    return [term for term in (*HEURISTIC_RISK_TERMS, *SYSTEM_ADDRESSED_TERMS) if term in text]
+    hits = [term for term in HEURISTIC_RISK_TERMS if term in text]
+    hits.extend(m.group(0) for m in SYSTEM_ADDRESSED_PATTERNS.finditer(text))
+    return hits
 
 
 def _heuristic_opinion(line: ReconciledLine) -> LLMOpinion:
