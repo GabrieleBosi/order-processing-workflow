@@ -11,6 +11,28 @@ the process predictable, traceable and evaluable. The model is used only
 where text is irregular; everything that can be code, is code - exact, free
 and testable.
 
+```mermaid
+flowchart LR
+    IN["Customer PO<br/>.eml / .pdf / .xlsx / .csv / .txt"] --> N
+
+    subgraph P["Fixed-step pipeline"]
+        direction LR
+        N["1 · Normalize<br/><i>code + OCR fallback</i>"] --> E["2 · Extract<br/><i>code for tables,<br/>LLM for free text</i>"]
+        E --> R["3 · Reconcile<br/><i>SQL vs. master data</i>"]
+        R --> C["4 · Check<br/><i>rules, then LLM<br/>escalate-only</i>"]
+    end
+
+    C --> V{"Order verdict"}
+    V -- "auto_approve" --> H
+    V -- "needs_review" --> H["Human confirmation"]
+    V -- "reject" --> X["Not written"]
+    H -- "confirm" --> W["5 · ERP write<br/><i>code</i>"]
+    H -- "decline" --> X
+    W --> ERP[("ERP")]
+
+    P -. "runs/&lt;run_id&gt;/ trace per step" .-> T["Trace + evals"]
+```
+
 | # | Step | Executor | What it does |
 |---|------|----------|--------------|
 | 1 | **Normalize** | code (+ OCR fallback) | `.eml` / `.pdf` / `.xlsx` / `.csv` / `.txt` → one `NormalizedDocument` (text + tables). OCR only for scanned PDFs, and only if installed. |
@@ -89,11 +111,12 @@ replay: the hard floors are there to catch it if that run disagrees.
 
 The two jobs also run on different triggers, because they cost different
 things. `test` runs on every push and pull request. The model `gate` job runs
-**only on pushes to `main`, on a weekly schedule (Mondays 04:00 UTC) and on
-`workflow_dispatch`**: one execution spends most of a 1 USD budget and a few
-minutes of API calls, which is not worth paying on every push of a
-work-in-progress branch. Trigger it by hand from the Actions tab when a branch
-needs it.
+**on `workflow_dispatch` only**: one execution spends most of a 1 USD budget
+and a few minutes of API calls. It used to run on every push to `main` and on
+a weekly schedule too; both automatic triggers were switched off once the gate
+had been shown green, so that nothing spends API budget unattended. Trigger it
+by hand from the Actions tab when a change to prompts, thresholds or the model
+needs the gate re-measured.
 
 ### The case set
 
